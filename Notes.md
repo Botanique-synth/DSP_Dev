@@ -21,9 +21,8 @@ with{
 };
 process=stereo_interface;
 '
-[ok]
-
     for vcv
+- Quad interface
 '
 quad_interface(ia,ib,ic,id) = oa,ob,oc,od
 with{
@@ -31,7 +30,7 @@ with{
     sb = hslider("b[CV2]",0,0,1,0.01);
     sc = hslider("c[CV3]",0,0,1,0.01);
     sd = hslider("d[CV4]",0,0,1,0.01);
-
+  
     ba = button("ba");
     bb = button("bb");
     bc = button("bc");
@@ -44,9 +43,10 @@ with{
     oc = (1-bc)*f(ic,sc);
     od = (1-bd)*f(id,sd);
 };
-[ok]
-
-f_intf(ia,ib,ic,id,ie,if) = oa,ob,oc,od,oe,of
+'
+- Hexa interface
+'
+hexa_intf(ia,ib,ic,id,ie,if) = oa,ob,oc,od,oe,of
 with{
     sa = hslider("sa[CV1]",0,0,1,0.01);
     sb = hslider("sb[CV2]",0,0,1,0.01);
@@ -70,5 +70,5 @@ with{
     od = (1-bd)*f(id,sd);
     oe = (1-be)*f(ie,se);
     of = (1-bf)*f(if,sf);
-};
-[ok]
+}:
+'
