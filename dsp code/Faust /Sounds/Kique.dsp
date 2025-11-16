@@ -1,320 +1,115 @@
-en = library("envelopes.lib");
-os = library("oscillators.lib");
-ma = library("maths.lib");
-
-// broad-tuned kique module with built in interface
-Kique(p1) = y
-    with{
-        Crv(x, c) = y
-            with{
-                C = (-c*10)-5;
-                y = (exp(C*x) - 1) / (exp(C) - 1 + 1e-12);
-            };
-        tanhh(in,amt)= y
-        with{
-            y= ma.tanh( ma.tanh( ma.tanh(in*(1+(10*amt)))));
-        };
-        Hit_e(trig, alpha1 ,curve1) = y
-            with{
-            A1 = alpha1*.08 + 0.001; // 0 to 1s                        (to scale 10-80 ms on ref)
-            env = en.dx7envelope(
-            0.001, A1, 0.1, 0.1,   // r1 r2 r3 r4
-            1,    0, 0, 0,    // l1 l2 l3 l4
-            trig);
-            y = Crv(env,curve1);
-        };
-        Sub_e(trig, alpha1, alpha2, d, l, curve2) = y
-            with{
-            A1 = alpha1*.08 + 0.001; // 0 to 1s                             (to scale 10-80 ms on ref)
-            A2 = alpha2*.8 + 0.001; // 0 to 1s                             (to scale )
-            D = d*A1; // 0 to 1s                                              (to scale )
-                    // l from 0 to 1
-
-
-            R1 = D+0.001;
-            L1 = 0;
-            R2 = A1;
-            L2 = l;
-            R3 = A2;
-            L3 = 0;
-
-            env = en.dx7envelope(
-                R1, R2, R3, 0.1,   // r1 r2 r3 r4
-                L1, L2, L3, 0,    // l1 l2 l3 l4
-                trig);
-
-            y = Crv(env,curve2);
-        };
-        Kique_osc(f,t) = y
-            with{
-                    ph = os.lf_sawpos_phase_reset(f,0,0);
-                    y = sin(2*3.14*ph);
-            };
-
-        Hite = Hit_e(T,alpha1,c1);
-        Body = Sub_e(T,alpha1, alpha2, d, l , c2);
-
-        core = Hite * Kique_osc(f,T) + Body * Kique_osc(F,0);
-        y = tanhh(core,x);
-
-        superhit = Hite*Hite*Hite*Hite;
-        f = F*(1+superhit*F_env*4);
-
-        T = button("trig");
-        alpha1 = hslider("alpha 1",0,0,1,.001);
-        T1 = hslider("alpha 1",0,0,1,.001);
-        alpha2 = hslider("alpha 2",0,0,1,.001);
-        T2 = hslider("alpha 1",0,0,1,.001);
-        d      = hslider("D",0,0,1,.001);
-        l      = hslider("L",0,0,1,.001);
-        c1      = hslider("C1",0,0,1,.001);
-        c2      = hslider("C2",0,0,1,.001);
-        F       = hslider("f",50,25,100,1);
-        F_env   = hslider("fe",0,0,1,.001);
-        x       = hslider("X",0,0,1,.001);
-    };
-Hiplus(i) = oa,ob
-with{
-    a = hslider("a",0,0,1,0.01);
-    b = hslider("b",0,0,1,0.01);
-    c = hslider("c",0,0,1,0.01);
-    d = hslider("d",0,0,1,0.01);
-    e = hslider("e",0,0,1,0.01);
-    f = hslider("f",0,0,1,0.01);
-
-    ba = button("ba");
-
-    ca = nentry("ca [CV:1]", 0, 0, 1, 0.01);
-    cb = nentry("cb [CV:2]", 0, 0, 1, 0.01);
-    cc = nentry("cc [CV:3]", 0, 0, 1, 0.01);
-    cd = nentry("cd [CV:4]", 0, 0, 1, 0.01);
-    ce = nentry("ce [CV:5]", 0, 0, 1, 0.01);
-    cf = nentry("cf [CV:6]", 0, 0, 1, 0.01);
-    p1(k,i)=k*i;
-
-    oa = Kique(a);
-    ob = oa;};
-
-process=Hiplus(1);
-
-
-
-// playground
-en = library("envelopes.lib");
-os = library("oscillators.lib");
-ma = library("maths.lib");
-
-Crv(x, c) = y
-    with{
-     C = (-c*10)-5;
-     y = (exp(C*x) - 1) / (exp(C) - 1 + 1e-12); };
-tanhh(in,amt)= y
-        with{
-            y= ma.tanh( ma.tanh( ma.tanh(in*(1+(10*amt)))));
-        };
-Hit_e(trig, alpha1 ,curve1) = y
-            with{
-            A1 = alpha1*.08 + 0.001; // 0 to 1s                        (to scale 10-80 ms on ref)
-            env = en.dx7envelope(
-            0.001, A1, 0.1, 0.1,   // r1 r2 r3 r4
-            1,    0, 0, 0,    // l1 l2 l3 l4
-            trig);
-            y = Crv(env,curve1);
-        };
-Sub_e(trig, alpha1, alpha2, d, l, curve2) = y
-            with{
-            A1 = alpha1*.08 + 0.001; // 0 to 1s                             (to scale 10-80 ms on ref)
-            A2 = alpha2*.8 + 0.001; // 0 to 1s                             (to scale )
-            D = d*A1; // 0 to 1s                                              (to scale )
-                    // l from 0 to 1
-
-
-            R1 = D+0.001;
-            L1 = 0;
-            R2 = A1;
-            L2 = l;
-            R3 = A2;
-            L3 = 0;
-
-            env = en.dx7envelope(
-                R1, R2, R3, 0.1,   // r1 r2 r3 r4
-                L1, L2, L3, 0,    // l1 l2 l3 l4
-                trig);
-
-            y = Crv(env,curve2);
-        };
-Kique_osc(f,Retrig,Tone) = y
-                with{
-                    impulse = Retrig : ba.impulsify;
-                    ph = os.lf_sawpos_phase_reset(f,0,impulse);  // [0-1 resetable]
-                    amp = (ph*2)-1;                 //  ramp [-1 to 1 ]
-                    tri = ma.tanh((abs(ph-.5)-.25)*16);                 //  ramp [-1 to 1 ] tri(x)=(abs(x-.5)-.25)*4
-
-                    bi =2 * ( tri - s);
-                    s =  cos(6.28*ph);
-
-                    y = s*(1-Tone)+bi*Tone;
-                    };
-//
-superhit = Hite*Hite*Hite*Hite;
-f = F*(1+superhit*F_env*4);
-
-        T = button("trig");
-        alpha1 = hslider("alpha 1",0,0,1,.001);
-        c1      = hslider("C1",0,0,1,.001);
-        T1 = hslider("alpha 1",0,0,1,.001);
-        alpha2 = hslider("alpha 2",0,0,1,.001);
-        c2      = hslider("C2",0,0,1,.001);
-        T2 = hslider("alpha 1",0,0,1,.001);
-        d      = hslider("D",0,0,1,.001);
-        l      = hslider("L",0,0,1,.001);
-        F       = hslider("f",50,25,100,1);
-        F_env   = hslider("fe",0,0,1,.001);
-        x       = hslider("X",0,0,1,.001);
-
-
-
-
-Hite = Hit_e(T,alpha1,c1);
-Body = Sub_e(T,alpha1, alpha2, d, l , c2);
-core = Hite * Kique_osc(f,T) + Body * Kique_osc(F,0);
-y = tanhh(core,x);
-
-process = y,y;
-
-
-//
-//
- Kique_osc(f,Retrig,x) = y
-    with{
-        impulse = Retrig : ba.impulsify;
-        ph = os.lf_sawpos_phase_reset(f,0,impulse);  // [0-1 resetable]
-        // y = shp(ph,Tone,a,b,c);
-        y = su;
-
-        ramp = (ph*2)-1;                 //  ramp [-1 to 1 ]
-        tri =(abs(ph-.5)-.25)*4;                 //  ramp [-1 to 1 ] tri(x)=(abs(x-.5)-.25)*4
-        s = cos(6.28*ph);
-
-        su = ramp+tri; //??
-
-    };
-
-//
-//
-//
-Kique_osc(f,Retrig,Tone) = y
-                with{
-                    impulse = Retrig : ba.impulsify;
-                    ph = os.lf_sawpos_phase_reset(f,0,impulse);  // [0-1 resetable]
-                    amp = (ph*2)-1;                 //  ramp [-1 to 1 ]
-                    tri = ma.tanh((abs(ph-.5)-.25)*16);                 //  ramp [-1 to 1 ] tri(x)=(abs(x-.5)-.25)*4
-
-                    bi =2 * ( tri - s);
-                    s =  cos(6.28*ph);
-
-                    y = s*(1-Tone)+bi*Tone;
-                    };
-
-
-Kique_osc(f,Retrig,Tone) = y
-    with{
-        impulse = Retrig : ba.impulsify;
-        ph = os.lf_sawpos_phase_reset(f,0,impulse);  // [0-1 resetable]
-        amp = (ph*2)-1;                 //  ramp [-1 to 1 ]
-        tri = ma.tanh((abs(ph-.5)-.25)*16);                 //  ramp [-1 to 1 ] tri(x)=(abs(x-.5)-.25)*4
-
-        bi =2 * ( tri - s);
-
-        s =  cos(6.28*ph);
-
-        y = s*(1-Tone)+bi*Tone;
-    };
-///
-
-
-
-/// tone playground
-
+declare name "Kique";
+declare version "1.0";
 
 en = library("envelopes.lib");
 os = library("oscillators.lib");
 ma = library("maths.lib");
+ba = library("basics.lib");
 
-Crv(x, c) = y
-    with{
-     C = (-c*10)-5;
-     y = (exp(C*x) - 1) / (exp(C) - 1 + 1e-12); };
-tanhh(in,amt)= y
-        with{
-            y= ma.tanh( ma.tanh( ma.tanh(in*(1+(10*amt)))));
-        };
-Hit_e(trig, alpha1 ,curve1) = y
-            with{
-            A1 = alpha1*.08 + 0.001; // 0 to 1s                        (to scale 10-80 ms on ref)
-            env = en.dx7envelope(
-            0.001, A1, 0.1, 0.1,   // r1 r2 r3 r4
-            1,    0, 0, 0,    // l1 l2 l3 l4
-            trig);
-            y = Crv(env,curve1);
-        };
-Sub_e(trig, alpha1, alpha2, d, l, curve2) = y
-            with{
-            A1 = alpha1*.08 + 0.001; // 0 to 1s                             (to scale 10-80 ms on ref)
-            A2 = alpha2*.8 + 0.001; // 0 to 1s                             (to scale )
-            D = d*A1; // 0 to 1s                                              (to scale )
-                    // l from 0 to 1
+Kique (f, trig ,vel ,delta1, delta2, Tau1, Tau2, X, fe);
+with {
+        //                                                                          {envelope block}  {trig, alpha1, alpha2, d, l, c1, c2}
+        //                                                                          {ideal}  {trig, delta1,delta2} + rework time scaling
+
+        //   delta timemanagement system
+        alpha1 = delta1;
+        alpha2 = delta2;
+        //
+
+        //
+        A1 = alpha1 * 0.08 + 0.001;   //  }---> alpha one scaled to range ofm 0.001 to 0.081
+        A2 = alpha2 * 0.8 + 0.001;
+        c1 = 0;                       // <-- maybe add delta impact ?
+        c2 = 0;
+        l  = .5;
+        //
+
+        // Hit envelope
+        //                                in -> {trig alpha1}
+
+        hit_env = en.dx7envelope(
+            0.001, A1, 0.1, 0.1,
+            1, 0, 0, 0,
+            trig
+        );
+        hit_shaped =
+            (exp((-c1 * 10) - 5 * hit_env) - 1) /
+            (exp((-c1 * 10) - 5) - 1 + 1e-12);          // <- curve function
+                //                         out {hit_shaped}
 
 
-            R1 = D+0.001;
-            L1 = 0;
-            R2 = A1;
-            L2 = l;
-            R3 = A2;
-            L3 = 0;
 
-            env = en.dx7envelope(
-                R1, R2, R3, 0.1,   // r1 r2 r3 r4
-                L1, L2, L3, 0,    // l1 l2 l3 l4
-                trig);
+        // Sub envelope
+        //                                in -> {trig alpha1}
 
-            y = Crv(env,curve2);
-        };
-Kique_osc(f,Retrig,Tone) = y
-                with{
-                    impulse = Retrig : ba.impulsify;
-                    ph = os.lf_sawpos_phase_reset(f,0,impulse);  // [0-1 resetable]
-                    amp = (ph*2)-1;                 //  ramp [-1 to 1 ]
-                    tri = ma.tanh((abs(ph-.5)-.25)*16);                 //  ramp [-1 to 1 ] tri(x)=(abs(x-.5)-.25)*4
+        sub_env = en.dx7envelope(
+            0.001, A1, A2, 0.1,       //  }---> rise with a1 time decay in a2
+            0, l, 0, 0,
+            trig
+        );
+        sub_shaped =
+            (exp((-c2 * 10) - 5 * sub_env) - 1) /
+            (exp((-c2 * 10) - 5) - 1 + 1e-12);          // <- curve function
+        //                                                                          outs -> {hit_shaped sub_shaped}
 
-                    bi =2 * ( tri - s);
-                    s =  cos(6.28*ph);
-
-                    y = s*(1-Tone)+bi*Tone;
-                    };
-//
-superhit = Hite*Hite*Hite*Hite;
-f = F*(1+superhit*F_env*4);
-
-        T = button("trig");
-        alpha1 = hslider("alpha 1",0,0,1,.001);
-        c1      = hslider("C1",0,0,1,.001);
-        T1 = hslider("alpha 1",0,0,1,.001);
-        alpha2 = hslider("alpha 2",0,0,1,.001);
-        c2      = hslider("C2",0,0,1,.001);
-        T2 = hslider("alpha 1",0,0,1,.001);
-        d      = hslider("D",0,0,1,.001);
-        l      = hslider("L",0,0,1,.001);
-        F       = hslider("f",50,25,100,1);
-        F_env   = hslider("fe",0,0,1,.001);
-        x       = hslider("X",0,0,1,.001);
+        //                                                                          Frequency calculator
+        // inputs                       {f1,fE,hit_shaped,sub_shaped}
+        f1 = f ;
+        fe = fE ;
+        // calc
+        f1d = 30+f1*20;
+        f2d = 30+f1*20;
+        hd  = hit_shaped*(36*fe);
+        sd  = sub_shaped*(36*fe);
+        fhit = ba.pianokey2hz(f1d + hd);
+        ffsub= ba.pianokey2hz(f2d + sd);
+        // outpus                       {fhit,ffsub}
 
 
 
 
-Hite = Hit_e(T,alpha1,c1);
-Body = Sub_e(T,alpha1, alpha2, d, l , c2);
-core = Hite * Kique_osc(f,T,T1) + Body * Kique_osc(F,T,T2);
-y = tanhh(core,x);
+        //                                                                           Oscillator  I
+        // ins                          {fhit trig shp }
+        impulse1 = trig : ba.impulsify;
+        ph1 = os.lf_sawpos_phase_reset(fhit, 0, impulse1);
+        tri1 = ma.tanh((abs(ph1 - 0.5) - 0.25) * 16);
+        bi1 = 2 * (tri1 - s1);
+        s1 = cos(6.28 * ph1);
+        osc1 = s1 * (1 - Tau1) + bi1 * Tau1;                                              // <- tone 1 : Tau for now sin to tri
+        // out                          {osc1}
 
-process = y,y;
+        //                                                                           Oscillator  II
+        // ins                          {ffsub trig shp }
+        impulse2 = trig : ba.impulsify;
+        ph2 = os.lf_sawpos_phase_reset(ffsub, 0, impulse2);
+        tri2 = ma.tanh((abs(ph2 - 0.5) - 0.25) * 16);
+        bi2 = 2 * (tri2 - s2);
+        s2 = cos(6.28 * ph2);
+        osc2 = s2 * (1 - Tau2) + bi2 * Tau2;                                              // <- tone 1 : Tau for now sin to tri
+        // out                          {osc2}
+
+        // Mixer block                  {osc1 osc 2 hit_shaped sub_shaped}
+        Hit  = hit_shaped * osc1 * 1.2;
+        Body = sub_shaped * osc2;
+        crude = Hit + Body;
+        //                              {crude out}
+
+        // tanh                         {in x}
+        y = ma.tanh(ma.tanh(ma.tanh(crude * (1 + (10 * X)))));
+};
+
+// UI Controls
+F = hslider("Base Freq", 50, 25, 100, 1);
+T = 1 - ba.beat(160);
+Delta1 = hslider("Tau 1", 0, 0, 1, 0.001);
+Delta2 = hslider("Tau 2", 0, 0, 1, 0.001);
+Tau1 = hslider("Tau 1", 0, 0, 1, 0.001);
+Tau2 = hslider("Tau 2", 0, 0, 1, 0.001);
+X = hslider("X", 0, 0, 1, 0.001);
+fE = hslider("Freq Env", 0, 0, 1, 0.001);
+
+
+// Main processing
+y = Kique(F, T, Tau1, Tau2, X, fE);
+
+process = y, y;
