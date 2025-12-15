@@ -1,24 +1,10 @@
 import("stdfaust.lib");
 
-//main clock
-main_clock = timephasor
+// Instruments
+additive(trig) = hgroup("[5] Addiv",um)
 with{
-    x = hslider("bpm",120,20,200,1);
-    run = button("Run?"):ba.toggle;
-    timephasor = vgroup("- Main clock",os.hs_phasor(1.0,x/60,run));
-};
-main_clock_trig = main_clock*-1;
-
-// euclidian rythm maker 
-euclid(tphz,div_n, active_steps, rot) = out
-with {
-    count = tphz*div_n : round; // counter from 0 to div_n -1 in tphz time 
-    number  = div_n*active_steps/100 : round; // nombre a tester si divisible par count 
-    test = count+rot , number : ma.modulo;
-    out = vgroup("euclidian",test);
-};
-additive(f,spread,trig) = hgroup("bell",um)
-with{
+    f = vslider("freq", 1,1,800,1) : si.smoo;
+    spread = vslider("spread",0,0,1,0.001);
     env = en.are(0.02,1,trig:ba.spulse(100));
     s = 1 + spread*3 ; 
     a = os.oscp(f,0);
@@ -29,25 +15,18 @@ with{
     g = os.oscp(f*s*s*s*s*s,1) ;
     um = env*env*env*env*(a+b+c+d+e+g)/6;
 };
-f = vslider("freq", 1,1,800,1) : si.smoo;
-spread = vslider("spread",0,0,1,0.001);
-
-active_steps  = hslider("[0]% active steps[style:knob]", 20, 20, 110, 1):si.smoo;
-rot           = hslider("rotation[style:knob]", 0, 0, 1, 0.01):si.smoo;
-div_n             = nentry("[1]subdivisions", 4 ,1, 32, 1);
-
-n       = vslider("f base", 0, 0, 1, 0.001);
-X       = vslider("X", 0, 0, 1, 0.001);
-alpha1  = vslider("decay", 0, 0, 1, 0.001) : si.smooth(0.5);
-famt    = vslider("famt", 0, 0, 1, 0.001);
-n_amt   = vslider("namt", 0, 0, 1, 0.001);        // max 0.2
-w       = vslider("fold", 0, 0, 1, 0.001);
-alpha2  = vslider("decay2", 0, 0, 1, 0.001) : si.smooth(0.5);
-d       = vslider("delay", 0, 0, 1, 0.001) : si.smooth(0.5);
-
-// kique hit
-kique (trig,alpha1,alpha2,n,famt,n_amt,X,w,d) = hgroup("kick",y)
+kique (trig) = hgroup("[2] Kick",y)
 with{
+    //params
+    n       = vslider("f base", 0, 0, 1, 0.001);
+    X       = vslider("X", 0, 0, 1, 0.001);
+    alpha1  = vslider("decay", 0, 0, 1, 0.001) : si.smooth(0.5);
+    famt    = vslider("famt", 0, 0, 1, 0.001);
+    n_amt   = vslider("namt", 0, 0, 1, 0.001);        // max 0.2
+    w       = vslider("fold", 0, 0, 1, 0.001);
+    alpha2  = vslider("decay2", 0, 0, 1, 0.001) : si.smooth(0.5);
+    d       = vslider("delay", 0, 0, 1, 0.001) : si.smooth(0.5);
+    //engine
     A1 = alpha1 * 0.08 + 0.001;
     Env = en.dx7envelope(
                 0.0001, 0.1, 0.1, A1,
@@ -80,14 +59,13 @@ with{
     sub = ma.tanh(ma.tanh(ma.tanh(amp2 * (1 + (10 * X)))));
     y = hit + sub;
 };
-
-f_h      = vslider("freq_hat", 1500,1500,2000,1) : si.smoo;
-spreadh = vslider("spread hat",0,0,1,0.001);
-dech    = vslider("decay",0,0,1,0.001);
-nh      = vslider("noise h ",0,0,1,0.001);
-
-Hate(fh,spreadh,nh,dech,trig) = hgroup("hate",out)
+Hate(trig) = hgroup("[4] Hate",out)
 with{
+    fh      = vslider("freq_hat", 1500,1500,2000,1) : si.smoo;
+    spreadh = vslider("spread hat",0,0,1,0.001);
+    dech    = vslider("decay",0,0,1,0.001);
+    nh      = vslider("noise h ",0,0,1,0.001);
+
     env = en.are(0,dech,trig:ba.impulsify:ba.spulse(10));
     s = 1.2 + spreadh/9 ; 
     a = os.square(fh);
@@ -100,9 +78,12 @@ with{
     noise = 5*env*nh*no.noise/20;
     out = summ+noise : fi.highpass(8,5000+fh/2);
 };
-
-snr(f,n,dec,trig) = hgroup("snr",out)
+snr(trig) = hgroup("[3] Snr",out)
 with{
+    f = vslider("freq", 200, 200,500,1) : si.smoo;
+    dec = vslider("decay",0,0,1,0.001);
+    n = vslider("noise",0,0,1,0.001);
+
     env = en.are(0,dec, trig:ba.impulsify:ba.spulse(10));
     a = os.oscsin(f*(1+env));
     summ = env*a;
@@ -110,33 +91,54 @@ with{
     out = summ+noise;
 };
 
-f_s = vslider("freq", 200, 200,500,1) : si.smoo;
-decay_s = vslider("decay",0,0,1,0.001);
-n_s = vslider("noise",0,0,1,0.001);
-
-
-
-
-all(clock_in) = out
+// Main clock
+main_clock = timephasor
 with{
+    x = hslider("bpm",120,20,200,1)/4;
+    run = 1-checkbox("Run!");
+    timephasor = vgroup("[0] Main clock",os.hs_phasor(1.0,x/60,run));
+};
+// Sequencers
+sequencers(phasor) = hgroup("[1]Sequencers",t1,t2,t3,t4,phasor)
+with{
+eu(tphz,i) = out_
+    with {
+    cnt = tphz*div_n : round; // counter from 0 to div_n -1 in tphz time 
+    nbr  = div_n*active_steps/100 : round; // nombre a tester si divisible par count 
+    tst = cnt+rot , nbr : ma.modulo;
+    out_ = tst;
 
-    tbell = euclid(clock_in,div_n, active_steps, rot):ba.impulsify;
-    bell = additive(f,spread,tbell);
-
-    trigkick = euclid(clock_in,div_n, active_steps, rot):ba.impulsify;
-    kick = kique (trigkick,alpha1,alpha2,n,famt,n_amt,X,w,d);
-    kout = vgroup("kique",kick);
-
-    that = euclid(clock_in,div_n, active_steps, rot):ba.impulsify;
-    hat = Hate(f_h,spreadh,nh,dech,that);
-    hat_out = vgroup("Hat",hat);
-
-    trig_s = euclid(clock_in,div_n, active_steps, rot):ba.impulsify;
-    snr_final = vgroup("Snare",snr(f_s,n_s,decay_s,trig_s));
-
-
-    preout = bell + hat_out + kout + snr_final ;
-    out = ma.tanh(preout); // antialias ?
+    active_steps  = hslider("[%] active steps[style:knob]", 20, 20, 110, 1):si.smoo;
+    rot           = hslider("rotation[style:knob]", 0, 0, 1, 0.01):si.smoo;
+    div_n         = nentry("[1]subdivisions", 4 ,1, 32, 1);
+    count = tphz*div_n : round; // counter from 0 to div_n -1 in tphz time 
+    number  = div_n*active_steps/100 : round; // nombre a tester si divisible par count 
+    test = count+rot , number : ma.modulo;
+    out = vgroup("euclidian",test);
+};
+    t1 = vgroup("[0]Kick_trig",eu(phasor,1):ba.impulsify);
+    t2 = vgroup("[1]Snare_trig",eu(phasor,2):ba.impulsify);
+    t3 = vgroup("[2]Hate_trig",eu(phasor,3):ba.impulsify);
+    t4 = vgroup("[3]Additive_trig",eu(phasor,4):ba.impulsify);
 };
 
-process = tgroup("drums",main_clock : all) <: _,_ ; // reorder processes clock > sequencers > sound engine
+// Player 
+ins_plyr(t1,t2,t3,t4,phasor) = out
+with{
+    i1 = kique (t1);
+    i2 = snr(t2);
+    i3 = Hate(t3);
+    i4 = additive(t4);
+    preout = i1 +i2 + i3 + i4;
+
+    out = ma.tanh(preout)*(1-(phasor==0)); // tanh to clip > antialias ?
+
+};
+
+process = tgroup("Beatroot", main_clock : sequencers : ins_plyr) <: _,_ ; 
+
+
+/// rework euclidian sequencers with tm knowledge
+
+
+
