@@ -32,6 +32,8 @@ with{
     };
 
 };
-flip = button("!") : ba.impulsify;
-prob = hslider("%", 0,0,1,0.01);
-process = tm(flip,prob);
+coinflip_pass(flip,bias) = out
+with{ 
+    out = pre*flip;
+    pre = (no.noise/2)+.5 < bias : ba.latch(flip);
+};

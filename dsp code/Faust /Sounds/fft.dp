@@ -1,8 +1,0 @@
-import("stdfaust.lib");
-
-an = library("analyzers.lib");
-
-N = 32;
-
-process = _, _ :> an.rtocv(2) : an.fft(2) : an.ifft(2) :> _ <: _,_ ;
-
