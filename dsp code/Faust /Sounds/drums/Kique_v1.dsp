@@ -6,7 +6,7 @@ os = library("oscillators.lib");
 ma = library("maths.lib");
 ba = library("basics.lib");
 
-Kique (f, trig ,vel ,delta1, delta2, Tau1, Tau2, X, fe);
+Kique (f, trig ,vel ,delta1, delta2, Tau1, Tau2, X, fe)
 with {
         //                                                                          {envelope block}  {trig, alpha1, alpha2, d, l, c1, c2}
         //                                                                          {ideal}  {trig, delta1,delta2} + rework time scaling
