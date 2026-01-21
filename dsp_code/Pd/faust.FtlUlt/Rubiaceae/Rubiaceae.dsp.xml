@@ -1,0 +1,255 @@
+
+<faust>
+	<name>Rubiaceae</name>
+	<author></author>
+	<copyright></copyright>
+	<license></license>
+	<version></version>
+	<classname>mydsp</classname>
+	<inputs>0</inputs>
+	<outputs>2</outputs>
+	<meta key="aanl.lib/ADAA1:author">Dario Sanfilippo</meta>
+	<meta key="aanl.lib/ADAA1:copyright">Copyright (C) 2021 Dario Sanfilippo     &lt;sanfilippo.dario@gmail.com&gt;</meta>
+	<meta key="aanl.lib/ADAA1:license">MIT License</meta>
+	<meta key="aanl.lib/name">Faust Antialiased Nonlinearities</meta>
+	<meta key="aanl.lib/tanh1:author">Dario Sanfilippo</meta>
+	<meta key="aanl.lib/tanh1:copyright">Copyright (C) 2021 Dario Sanfilippo     &lt;sanfilippo.dario@gmail.com&gt;</meta>
+	<meta key="aanl.lib/tanh1:license">MIT License</meta>
+	<meta key="aanl.lib/version">1.4.2</meta>
+	<meta key="basics.lib/counter:author">Stephane Letz</meta>
+	<meta key="basics.lib/name">Faust Basic Element Library</meta>
+	<meta key="basics.lib/sAndH:author">Romain Michon</meta>
+	<meta key="basics.lib/version">1.22.0</meta>
+	<meta key="compile_options">-lang cpp -fpga-mem-th 4 -ct 1 -es 1 -mcd 16 -mdd 1024 -mdy 33 -single -ftz 0</meta>
+	<meta key="delays.lib/name">Faust Delay Library</meta>
+	<meta key="delays.lib/version">1.2.0</meta>
+	<meta key="filename">Rubiaceae.dsp</meta>
+	<meta key="filters.lib/fir:author">Julius O. Smith III</meta>
+	<meta key="filters.lib/fir:copyright">Copyright (C) 2003-2019 by Julius O. Smith III &lt;jos@ccrma.stanford.edu&gt;</meta>
+	<meta key="filters.lib/fir:license">MIT-style STK-4.3 license</meta>
+	<meta key="filters.lib/highpass:author">Julius O. Smith III</meta>
+	<meta key="filters.lib/highpass:copyright">Copyright (C) 2003-2019 by Julius O. Smith III &lt;jos@ccrma.stanford.edu&gt;</meta>
+	<meta key="filters.lib/iir:author">Julius O. Smith III</meta>
+	<meta key="filters.lib/iir:copyright">Copyright (C) 2003-2019 by Julius O. Smith III &lt;jos@ccrma.stanford.edu&gt;</meta>
+	<meta key="filters.lib/iir:license">MIT-style STK-4.3 license</meta>
+	<meta key="filters.lib/lowpass0_highpass1">Copyright (C) 2003-2019 by Julius O. Smith III &lt;jos@ccrma.stanford.edu&gt;</meta>
+	<meta key="filters.lib/lowpass0_highpass1">MIT-style STK-4.3 license</meta>
+	<meta key="filters.lib/lowpass0_highpass1:author">Julius O. Smith III</meta>
+	<meta key="filters.lib/lowpass:author">Julius O. Smith III</meta>
+	<meta key="filters.lib/lowpass:copyright">Copyright (C) 2003-2019 by Julius O. Smith III &lt;jos@ccrma.stanford.edu&gt;</meta>
+	<meta key="filters.lib/lowpass:license">MIT-style STK-4.3 license</meta>
+	<meta key="filters.lib/name">Faust Filters Library</meta>
+	<meta key="filters.lib/resonbp:author">Julius O. Smith III</meta>
+	<meta key="filters.lib/resonbp:copyright">Copyright (C) 2003-2019 by Julius O. Smith III &lt;jos@ccrma.stanford.edu&gt;</meta>
+	<meta key="filters.lib/resonbp:license">MIT-style STK-4.3 license</meta>
+	<meta key="filters.lib/resonhp:author">Julius O. Smith III</meta>
+	<meta key="filters.lib/resonhp:copyright">Copyright (C) 2003-2019 by Julius O. Smith III &lt;jos@ccrma.stanford.edu&gt;</meta>
+	<meta key="filters.lib/resonhp:license">MIT-style STK-4.3 license</meta>
+	<meta key="filters.lib/resonlp:author">Julius O. Smith III</meta>
+	<meta key="filters.lib/resonlp:copyright">Copyright (C) 2003-2019 by Julius O. Smith III &lt;jos@ccrma.stanford.edu&gt;</meta>
+	<meta key="filters.lib/resonlp:license">MIT-style STK-4.3 license</meta>
+	<meta key="filters.lib/tf2:author">Julius O. Smith III</meta>
+	<meta key="filters.lib/tf2:copyright">Copyright (C) 2003-2019 by Julius O. Smith III &lt;jos@ccrma.stanford.edu&gt;</meta>
+	<meta key="filters.lib/tf2:license">MIT-style STK-4.3 license</meta>
+	<meta key="filters.lib/tf2s:author">Julius O. Smith III</meta>
+	<meta key="filters.lib/tf2s:copyright">Copyright (C) 2003-2019 by Julius O. Smith III &lt;jos@ccrma.stanford.edu&gt;</meta>
+	<meta key="filters.lib/tf2s:license">MIT-style STK-4.3 license</meta>
+	<meta key="filters.lib/version">1.7.1</meta>
+	<meta key="maths.lib/author">GRAME</meta>
+	<meta key="maths.lib/copyright">GRAME</meta>
+	<meta key="maths.lib/license">LGPL with exception</meta>
+	<meta key="maths.lib/name">Faust Math Library</meta>
+	<meta key="maths.lib/version">2.9.0</meta>
+	<meta key="misceffects.lib/dryWetMixer:author">David Braun, revised by Stéphane Letz</meta>
+	<meta key="misceffects.lib/name">Misc Effects Library</meta>
+	<meta key="misceffects.lib/version">2.5.1</meta>
+	<meta key="noises.lib/name">Faust Noise Generator Library</meta>
+	<meta key="noises.lib/version">1.5.0</meta>
+	<meta key="oscillators.lib/hs_phasor:author">Mike Olsen, revised by Stéphane Letz</meta>
+	<meta key="oscillators.lib/name">Faust Oscillator Library</meta>
+	<meta key="oscillators.lib/version">1.6.0</meta>
+	<meta key="platform.lib/name">Generic Platform Library</meta>
+	<meta key="platform.lib/version">1.3.0</meta>
+	<meta key="quantizers.lib/name">Faust Frequency Quantization Library</meta>
+	<meta key="quantizers.lib/version">1.1.2</meta>
+	<meta key="signals.lib/name">Faust Signal Routing Library</meta>
+	<meta key="signals.lib/version">1.6.0</meta>
+	<meta key="webaudio.lib/author">GRAME</meta>
+	<meta key="webaudio.lib/copyright">GRAME</meta>
+	<meta key="webaudio.lib/license">LGPL with exception</meta>
+	<meta key="webaudio.lib/name">Faust WebAudio Filters Library</meta>
+	<meta key="webaudio.lib/version">1.1.0</meta>
+	<ui>
+		<activewidgets>
+			<count>15</count>
+			<widget type="checkbox" id="1">
+				<label>Run!</label>
+				<varname>fCheckbox0</varname>
+			</widget>
+			<widget type="vslider" id="2">
+				<label>bpm</label>
+				<varname>fVslider4</varname>
+				<init>8e+01f</init>
+				<min>2e+01f</min>
+				<max>1e+02f</max>
+				<step>1.0f</step>
+			</widget>
+			<widget type="vslider" id="3">
+				<label>note seq</label>
+				<varname>fVslider8</varname>
+				<init>0.9f</init>
+				<min>0.0f</min>
+				<max>1.0f</max>
+				<step>0.01f</step>
+				<meta key="0"></meta>
+				<meta key="style">knob</meta>
+			</widget>
+			<widget type="vslider" id="4">
+				<label>trig %</label>
+				<varname>fVslider5</varname>
+				<init>0.5f</init>
+				<min>0.0f</min>
+				<max>1.0f</max>
+				<step>0.01f</step>
+				<meta key="1"></meta>
+				<meta key="style">knob</meta>
+			</widget>
+			<widget type="vslider" id="5">
+				<label>Exite shape</label>
+				<varname>fVslider6</varname>
+				<init>0.25f</init>
+				<min>0.0f</min>
+				<max>1.0f</max>
+				<step>0.01f</step>
+				<meta key="4"></meta>
+				<meta key="style">knob</meta>
+			</widget>
+			<widget type="hslider" id="6">
+				<label>Duration</label>
+				<varname>fHslider1</varname>
+				<init>5e+02f</init>
+				<min>1.0f</min>
+				<max>1e+03f</max>
+				<step>1.0f</step>
+				<meta key="0"></meta>
+				<meta key="style">knob</meta>
+			</widget>
+			<widget type="hslider" id="7">
+				<label>Feedback</label>
+				<varname>fHslider0</varname>
+				<init>0.75f</init>
+				<min>0.0f</min>
+				<max>1.0f</max>
+				<step>0.01f</step>
+				<meta key="1"></meta>
+				<meta key="style">knob</meta>
+			</widget>
+			<widget type="hslider" id="8">
+				<label>disp</label>
+				<varname>fHslider2</varname>
+				<init>0.5f</init>
+				<min>0.0f</min>
+				<max>1.0f</max>
+				<step>0.01f</step>
+				<meta key="style">knob</meta>
+			</widget>
+			<widget type="vslider" id="9">
+				<label>wet</label>
+				<varname>fVslider0</varname>
+				<init>0.5f</init>
+				<min>0.0f</min>
+				<max>1.0f</max>
+				<step>0.01f</step>
+			</widget>
+			<widget type="vslider" id="10">
+				<label>Decay</label>
+				<varname>fVslider10</varname>
+				<init>0.2f</init>
+				<min>0.0f</min>
+				<max>1.0f</max>
+				<step>0.01f</step>
+			</widget>
+			<widget type="vslider" id="11">
+				<label>Hsprd</label>
+				<varname>fVslider9</varname>
+				<init>0.0f</init>
+				<min>0.0f</min>
+				<max>1.0f</max>
+				<step>0.001f</step>
+			</widget>
+			<widget type="vslider" id="12">
+				<label>bpm</label>
+				<varname>fVslider1</varname>
+				<init>8e+01f</init>
+				<min>2e+01f</min>
+				<max>1e+02f</max>
+				<step>1.0f</step>
+			</widget>
+			<widget type="vslider" id="13">
+				<label>freq</label>
+				<varname>fVslider7</varname>
+				<init>1e+02f</init>
+				<min>1e+01f</min>
+				<max>8e+02f</max>
+				<step>1.0f</step>
+			</widget>
+			<widget type="vslider" id="14">
+				<label>n.o.h</label>
+				<varname>fVslider3</varname>
+				<init>4.0f</init>
+				<min>1.0f</min>
+				<max>32.0f</max>
+				<step>1.0f</step>
+			</widget>
+			<widget type="vslider" id="15">
+				<label>oddlvl</label>
+				<varname>fVslider2</varname>
+				<init>0.5f</init>
+				<min>0.0f</min>
+				<max>1.0f</max>
+				<step>0.001f</step>
+			</widget>
+		</activewidgets>
+		
+		<passivewidgets>
+			<count>0</count>
+		</passivewidgets>
+		
+		<soundfilewidgets>
+			<count>0</count>
+		</soundfilewidgets>
+		
+		<layout>
+			<group type="hgroup">
+				<label>Ambient machine</label>
+				<group type="vgroup">
+					<label>binary decoders</label>
+					<group type="vgroup">
+						<label>Main clock</label>
+						<widgetref id="1" />
+						<widgetref id="2" />
+					</group>
+					<widgetref id="3" />
+					<widgetref id="4" />
+					<widgetref id="5" />
+				</group>
+				<group type="vgroup">
+					<label>echo</label>
+					<widgetref id="6" />
+					<widgetref id="7" />
+					<widgetref id="8" />
+					<widgetref id="9" />
+				</group>
+				<group type="hgroup">
+					<label>rez</label>
+					<widgetref id="10" />
+					<widgetref id="11" />
+					<widgetref id="12" />
+					<widgetref id="13" />
+					<widgetref id="14" />
+					<widgetref id="15" />
+				</group>
+			</group>
+		</layout>
+	</ui>
+</faust>
