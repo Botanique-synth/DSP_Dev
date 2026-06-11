@@ -1,0 +1,15 @@
+#N canvas 4 49 450 300 10;
+#X declare -lib libdir -lib list-abs;
+#X obj 113 155 list-idx;
+#X obj 113 129 list;
+#X obj 113 101 t b a;
+#X obj 113 80 inlet;
+#X obj 157 79 inlet;
+#X obj 113 178 outlet;
+#X obj 114 215 declare -lib libdir -lib list-abs;
+#X connect 0 0 5 0;
+#X connect 1 0 0 0;
+#X connect 2 0 1 0;
+#X connect 2 1 0 1;
+#X connect 3 0 2 0;
+#X connect 4 0 1 1;

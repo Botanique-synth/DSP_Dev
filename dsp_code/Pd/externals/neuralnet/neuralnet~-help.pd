@@ -1,0 +1,15 @@
+#N canvas 868 41 546 940 10;
+#X obj 33 9 cnv 15 380 145 empty empty empty 20 12 0 14 #c4fcc4 #404040 0;
+#X text 38 131 Written by Alexandros Drymonitis;
+#X text 36 171 Arguments (optional):;
+#X obj 37 846 neuralnet~;
+#X text 77 219 If you want to load a saved model \, you can write its path as an argument without . For example \, ./examples/models/audio_autoencoder will load the audio_autoencoder.ann model found in the models folder;
+#X text 55 199 symbol args:;
+#X text 79 279 To specify that this is an autoencoder \, you have to use the "autoenc" or "ae" argument. This is needed whether you create a new network for training or if you load a saved model;
+#X text 79 339 To specify that this is the encoder part of an autoencoder \, you have to use the "encoder" argument. The same applies for a decoder with the "decoder" argument. This works only for saved models;
+#X text 37 16 [neuralnet~] is a feed forward artificial neural network object that supports various kinds of neural networks \, for classification \, regression \, and binary logistic regreassion. It is written in C from scratch and does not have any dependencies. It is based on the Python code from the book "Neural Networks from Scratch in Python". This is the signal-rate version of [neuralnet] that loads saved models that are trained with [neuralnet].;
+#X text 36 543 Inlet(s): input layer signals. in case of autoencoders \, there's only one inlet \, but the block size has to be equal to the number of neurons in the input and output layers. see examples 5 to 7;
+#X text 37 757 Outlet(s): output layer outputs. in case of autoencoders \, the same as the inlet applies;
+#X text 35 801 Check the examples in the examples 6 and 7 to see how to use this object;
+#X text 79 400 If you want to load a specific part of the network \, you can use the "-first_layer" and "-num_layers" arguments. For example \, with a network with seven layers in total \, [neuralnet /path/to/model -first_layer 0 -num_layers 4] will load the first four layers \, where are [neuralnet /path/to/model -first layer 3 -num_layers 4] will load 4 layers \, starting from the third hidden layer (see example 06-audio_autoencdoer.tilde.pd);
+#X text 53 604 The first inlet can also take the "one_value_per_block \$1" message \, where if \$1 is 1 \, [neuralnet~] will predict only one value per sample block \, and if it is 0 \, it will predict one value per sample. This is useful in case of an Multi-Layer Perceptron (MLP) \, a.k.a. feed-forward dense neural network \, that controls parameters of some kind (e.g. if the example 03-mouse_input is created with the signal-rate object) \, to save some CPU. In case of an autoencoder \, this feature must be disabled.;

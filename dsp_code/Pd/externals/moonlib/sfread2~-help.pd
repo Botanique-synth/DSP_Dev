@@ -1,0 +1,88 @@
+#N canvas 588 132 708 498 10;
+#X obj 0 0 cnv 8 100 60 empty empty sfread2~ 10 20 1 18 -262144 -1109
+0;
+#X text 2 459 (c) Moonix: Antoine Rousseau 2003;
+#X text 66 390 Change "mlockall(MCL_FUTURE)" with "mlockall(MCL_CURRENT)
+;
+#X obj 155 262 sfread2~ 2;
+#X msg 155 202 open \$1;
+#X obj 19 151 bng 15 250 50 0 empty empty play 20 8 1 8 -24198 -1 -1
+;
+#X msg 253 168 loop \$1;
+#X obj 253 150 tgl 15 1 empty empty loop 20 8 0 8 -241291 -1 -1 1 1
+;
+#X obj 57 103 tgl 15 1 empty empty interpolation 20 8 1 8 -257472 -1
+-1 1 1;
+#X msg 57 121 interp \$1;
+#X obj 588 181 vsl 15 128 -8 8 0 0 empty empty speed 0 -8 1 8 -260818
+-1 -1 6644 1;
+#X text 135 12 soundfile reader at variable speed (possibly negative)
+\, whith 4-point interpolation and loop.;
+#X obj 154 296 dac~;
+#X obj 155 92 openpanel;
+#X obj 155 72 bng 15 250 50 0 empty empty open 0 -6 1 8 -166441 -1
+-1;
+#X obj 18 179 bng 15 250 50 0 empty empty stop 20 8 1 8 -1 -1 -1;
+#X msg 18 196 0;
+#X obj 148 339 sfread~;
+#X text 43 341 read manual of;
+#X text 202 339 for more details...;
+#X text 354 144 resets sound to position;
+#X text 353 133 start position in samples;
+#X msg 357 159 index 20000;
+#X obj 627 177 loadbang;
+#X msg 627 196 1;
+#X msg 261 99 symbol /usr/local/lib/pd/doc/sound/voice.wav;
+#X msg 261 78 symbol ../../doc/sound/voice.wav;
+#X text 66 414 If not \, the whole file will be loaded in memory when
+opened (use of C function mmap()).;
+#N canvas 592 238 494 344 META 0;
+#X text 12 25 LICENSE GPL v2;
+#X text 12 165 AUTHOR Antoine Rousseau;
+#X text 12 185 HELP_PATCH_AUTHORS Antoine Rousseau. "pd meta" information
+added by Jonathan Wilkes for Pd version 0.42.;
+#X text 12 5 KEYWORDS signal soundfile;
+#X text 12 45 DESCRIPTION soundfile reader at variable speed (possibly
+negative) \, whith 4-point interpolation and loop;
+#X text 12 85 INLET_0 float bang interp open index loop;
+#X text 12 105 INLET_1 float;
+#X text 12 145 comment;
+#X text 12 125 OUTLET_N signal;
+#X text 12 145 OUTLET_R float;
+#X restore 526 459 pd META;
+#X text 67 365 CAUTION: it's possible to hack pd sources to have real
+d-t-d working :;
+#X text 66 401 in s_inter.c;
+#X obj 199 314 print status;
+#X obj 222 292 print length;
+#X msg 357 189 index;
+#X floatatom 584 140 5 0 0 0 - - -, f 5;
+#X text 401 188 get current index;
+#X msg 357 219 state;
+#X text 401 218 get playing state (0/1);
+#X msg 357 244 size;
+#X text 393 242 get file size in samples;
+#X connect 3 0 12 0;
+#X connect 3 1 12 1;
+#X connect 3 2 31 0;
+#X connect 3 3 32 0;
+#X connect 4 0 3 0;
+#X connect 5 0 3 0;
+#X connect 6 0 3 0;
+#X connect 7 0 6 0;
+#X connect 8 0 9 0;
+#X connect 9 0 3 0;
+#X connect 10 0 3 1;
+#X connect 13 0 4 0;
+#X connect 14 0 13 0;
+#X connect 15 0 16 0;
+#X connect 16 0 3 0;
+#X connect 22 0 3 0;
+#X connect 23 0 24 0;
+#X connect 24 0 10 0;
+#X connect 25 0 4 0;
+#X connect 26 0 4 0;
+#X connect 33 0 3 0;
+#X connect 34 0 10 0;
+#X connect 36 0 3 0;
+#X connect 38 0 3 0;

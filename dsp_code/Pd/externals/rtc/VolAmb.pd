@@ -1,0 +1,16 @@
+#N canvas 64 76 290 234 10;
+#X declare -lib libdir -lib cyclone;
+#X obj 45 42 inlet;
+#X obj 93 151 outlet;
+#X obj 45 150 outlet;
+#X obj 45 120 Table;
+#C restore;
+#X floatatom 45 70 0 0 0 0 - - -;
+#X obj 93 120 Table;
+#C restore;
+#X obj 43 192 declare -lib libdir -lib cyclone;
+#X connect 0 0 4 0;
+#X connect 3 0 2 0;
+#X connect 4 0 3 0;
+#X connect 4 0 5 0;
+#X connect 5 0 1 0;
