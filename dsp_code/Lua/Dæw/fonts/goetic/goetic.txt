@@ -1,0 +1,100 @@
+           GOETIA SIGILS FONT FROM THE NU ISIS WORKING GROUP
+
+nigoa___.ttf  NI Goetic A
+
+The sigils and other characters in this face are based on the forms 
+printed in the Mathers-Crowley edition of the _Goetia_, including the 
+circular borders with the names of Spirits.  The eight variant sigils 
+are included as is the variant form of the Secret Seal.
+
+Keymaps:
+
+!: Hexagram of Solomon
+#: Pentagram of Solomon
+$: Secret Seal of Solomon
+%: (variant form of above)
+): Bael
+*: Agares
++: Vassago
+,: Samigina
+-: Marbas
+.: Valefor
+/: Amon
+0: Barbatos
+1: Paimon
+2: variant Paimon
+3: Buer
+4: Gusion
+5: Sitri
+6: Beleth
+7: variant Beleth
+8: Leraie
+9: variant Leraie
+:: Eligos
+;: Zepar
+<: Botis
+=: Bathin
+>: variant Bathin
+?: Sallos
+@: Purson
+A: Marax
+B: Ipos
+C: Aim
+D: Naberius
+E: Glasya-Labolas
+F: Bune (complex form)
+G: Bune (simplified form)
+H: Ronove
+I: Berith
+J: Astaroth
+K: Forneus
+L: Foras
+M: Asmoday
+N: Gaäp
+O: Furfur
+P: Marchosias
+Q: Stolas
+R: Phenex
+S: Halphas
+T: Malphas
+U: Raüm
+V: Focalor
+W: Vepar
+X: variant Vepar
+Y: Sabnock
+Z: Shax
+[: Viné
+\: Bifrons
+]: Vual
+^: variant Vual
+_: Haagenti
+`: Crocell
+a: Furcas
+b: Balam
+c: Alloces
+d: Camio
+e: Murmur
+f: Orobas
+g: Gremory
+h: Osé
+i: Amy
+j: Orias
+k: Vapula
+l: Zagan
+m: Valac
+n: Andras
+o: Haures
+p: Andrealphas
+q: Cimeies
+r: Amdusias
+s: Belial
+t: Decarabia
+u: Seere
+v: variant Seere
+w: Dantalion
+x: Andromalius
+~: Dancingstar's mark
+
+This font may be freely redistributed and used provided that the header 
+information in the font file including the line "This freeware font created 
+by the Nu Isis Working Group" is left intact in any distribution. 

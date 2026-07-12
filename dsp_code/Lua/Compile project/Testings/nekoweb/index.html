@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Rubiaceae Faust/Lua WASM Module</title>
+    <style>
+        body { font-family: sans-serif; margin: 2em; }
+        #output { margin-top: 1em; white-space: pre-wrap; background:#f4f4f4; padding:1em; border-radius:4px; }
+        button { margin:0.5em; padding:0.5em 1em; }
+    </style>
+</head>
+<body>
+    <h1>Rubiaceae WASM Module</h1>
+    <div id="output">Loading...</div>
+    <button id="testBtn">Test Module</button>
+    <script type="module">
+        console.log('Loading module...');
+        // Correct relative path: from .../Lua/Compile project/Testings/nekoweb/index.html
+        // go up three levels to Lua, then into Rubiaceae/nekoweb
+        const modulePath = '../../../Rubiaceae/nekoweb/game.js';
+        const wasmPath = '../../../Rubiaceae/nekoweb/game.wasm';
+        console.log('Module path:', modulePath);
+        console.log('WASM path:', wasmPath);
+        let ModuleInstance;
+        try {
+            const { createRubiaceaeModule } = await import(modulePath);
+            const Module = await createRubiaceaeModule({
+                // locateFile can be omitted if we give correct wasmBinaryFile
+                wasmBinaryFile: wasmPath
+            });
+            console.log('Module created', Module);
+            // Initialize DSP
+            const dspPtr = Module._dsp_new();
+            Module._dsp_start(dspPtr);
+            console.log('DSP started, ptr:', dspPtr);
+            // Helper to get/set param by index (assuming Faust exposes these)
+            function setParam(index, value) {
+                Module._dsp_set_param(dspPtr, index, value);
+            }
+            function getParam(index) {
+                return Module._dsp_get_param(dspPtr, index);
+            }
+            // Get JSON UI
+            const jsonPtr = Module._dsp_get_json_ui(dspPtr);
+            const len = Module.lengthBytesUTF8(jsonPtr);
+            const jsonStr = Module.UTF8ToString(jsonPtr, len);
+            console.log('JSON UI:', jsonStr);
+            const uiDesc = JSON.parse(jsonStr);
+            // Flatten widgets
+            function collectWidgets(node, prefix = '', out = []) {
+                if (!node) return out;
+                if (node.type === 'hgroup' || node.type === 'vgroup' || node.type === 'tgroup') {
+                    if (node.children) {
+                        for (const ch of node.children) {
+                            collectWidgets(ch, prefix, out);
+                        }
+                    }
+                    return out;
+                }
+                const addr = prefix + node.address;
+                const w = {
+                    label: node.label,
+                    type: node.type,
+                    address: addr,
+                    init: node.init,
+                    min: node.min,
+                    max: node.max,
+                    step: node.step
+                };
+                out.push(w);
+                return out;
+            }
+            const widgets = collectWidgets(uiDesc);
+            console.log('Widgets:', widgets);
+            // Build UI
+            const container = document.createElement('div');
+            container.style.display = 'grid';
+            container.style.gap = '1em';
+            container.style.maxWidth = '600px';
+            widgets.forEach(w => {
+                const label = document.createElement('label');
+                label.textContent = w.label;
+                label.style.display = 'block';
+                let input;
+                if (w.type === 'vslider' || w.type === 'hslider') {
+                    input = document.createElement('input');
+                    input.type = 'range';
+                    input.min = w.min ?? 0;
+                    input.max = w.max ?? 1;
+                    input.step = w.step ?? 0.01;
+                    input.value = w.init ?? 0;
+                    input.addEventListener('input', e => {
+                        setParam(w.address, parseFloat(e.target.value));
+                    });
+                    // Set initial param
+                    setParam(w.address, parseFloat(input.value));
+                } else if (w.type === 'checkbox' || w.type === 'button') {
+                    input = document.createElement('input');
+                    input.type = 'checkbox';
+                    input.checked = !! (w.init ?? 0);
+                    input.addEventListener('change', e => {
+                        setParam(w.address, e.target.checked ? 1 : 0);
+                    });
+                    setParam(w.address, input.checked ? 1 : 0);
+                } else {
+                    // fallback slider
+                    input = document.createElement('input');
+                    input.type = 'range';
+                    input.min = w.min ?? 0;
+                    input.max = w.max ?? 1;
+                    input.step = w.step ?? 0.01;
+                    input.value = w.init ?? 0;
+                    input.addEventListener('input', e => {
+                        setParam(w.address, parseFloat(e.target.value));
+                    });
+                    setParam(w.address, parseFloat(input.value));
+                }
+                const wrapper = document.createElement('div');
+                wrapper.appendChild(label);
+                wrapper.appendChild(input);
+                container.appendChild(wrapper);
+            });
+            document.body.appendChild(container);
+            document.getElementById('output').textContent = 'DSP loaded. Use controls above.';
+            document.getElementById('testBtn').addEventListener('click', () => {
+                console.log('Test click');
+                // Example: read a parameter
+                if (widgets.length > 0) {
+                    const val = getParam(widgets[0].address);
+                    alert(`First param (${widgets[0].label}) = ${val}`);
+                }
+            });
+        } catch (e) {
+            console.error('Error:', e);
+            document.getElementById('output').textContent = `Error: ${e}`;
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+1 - compile faust dsp 
+    faust2api -portaudio -midi patchname.dsp
+2 - unzip
+3 - add bridge.cpp to dsp-fasut dir
+4 - compile with build.sh in native mode
+5 - get param names in dsp-faust/README
+4 - use them in lua to send params to faust 

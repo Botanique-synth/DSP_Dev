@@ -1,0 +1,2734 @@
+======================================================================
+  DSP MARKET RESEARCH — Machine Specs + FAUST Hints
+  Digitakt · Tonverk · Torso · Yamaha SY · Octatrack · Rytm · A4
+  OP1/Z · Machinedrum · Monomachine · T-1/TS-1 · Panharmonium
+  Electribe · Make Noise
+======================================================================
+  Compiled for FAUST DSP implementation.
+  couvrant : architecture, paramètres, filtres, effets, modulations
+======================================================================
+
+
+======================================================================
+1.  ELEKTRON DIGITAKT I  (Original)
+======================================================================
+
+Type           : Sample-based subtractive groovebox
+Échantillonnage: 48 kHz / 16-bit / mono par piste
+Pistes         : 8 mono (mixées vers master stéréo)
+Polyphonie     : 8 voix (une par piste, monophonique)
+Mémoire        : 64 MB RAM, 1 GB+ stockage CF
+Overbridge     : 8 canaux audio discrets + 8 MIDI via USB
+
+--- CHAÎNE PAR PISTE ---
+
+  Sample → Filter → Amp → Pan → Master
+
+- PAS d'effets insert (différence fondamentale avec DT2)
+- PAS d'effets send par piste individuels
+- Modulation : 1 LFO + 1 ADSR par piste
+
+--- FILTRE ---
+
+  Param  | Description
+  -------|------------
+  FREQ   | Cutoff (C0–C7)
+  RESO   | Résonance (auto-oscillation possible)
+  TYPE   | LP / HP / BP / BR (band reject)
+  MODE   | Clean / Dirty (Dirty = saturation analogique simulée)
+
+  FAUST : fi.lowpass / fi.highpass / fi.bandpass / fi.resonbp
+          Dirty mode = ajouter ef.cubicnl(drive, offset) avant filtre.
+          Self-oscillation = gain de résonance ≥ 1.0.
+
+--- ENVELOPPE (ADSR) ---
+
+  A → D → S → R   (identique pour Filter et Amp)
+
+  FAUST : en.adsr(attack, decay, sustain, release, gate)
+
+--- LFO ---
+
+  Param  | Description
+  -------|------------
+  SPD    | Speed (sync BPM ou Hz)
+  MULT   | Multiplicateur
+  WAVE   | Saw / Tri / Sin / Sqr / S&H / Exp
+  DEPTH  | Profondeur (bipolaire)
+  FADE   | Fade in/out
+  DEST   | Destination
+
+  FAUST : os.osc[waveform] → si.smoo → modulateur
+
+--- EFFETS MASTER (GLOBAUX) ---
+
+Master Compressor (stéréo)
+  Param  : Threshold / Ratio / Attack / Release / Make-up / Mix
+  FAUST  : Envelope follower + soft-knee gain reduction (voir soft-knee
+           plus bas dans la section Tonverk/Compressor)
+
+Master Reverb (send global)
+  Param  : Predelay / Decay / LP Damp / HP Damp / Mix
+  FAUST  : re.stereo_fdn_demo — ajuster damping avec fi.lowpass/fi.highpass
+           dans boucles de feedback.
+
+Master Delay (send global)
+  Param  : Time (sync BPM) / Feedback / Ping-Pong / Mix
+  FAUST  : de.delay avec fi.lowpass dans boucle feedback.
+           Ping-pong = cross-feedback L/R avec signe opposé.
+
+--- NOTES FAUST DIGITAKT I ---
+
+• Architecture 8 pistes mono : 8 instances parallèles.
+• Pas d'effets insert → on simule en FAUST : Sample→Filter→Amp→Master
+• La sortie Master reçoit le sum des 8 pistes.
+• Les enveloppes Filter et Amp sont indépendantes.
+• Dirty filter mode = ajout de saturation avant le filtre résonant.
+
+
+======================================================================
+2.  ELEKTRON DIGITAKT II  (Digitakt II)
+======================================================================
+
+Type           : Sample-based, 16 pistes (8+8)
+Échantillonnage: 48 kHz / 16-bit / stéréo
+Polyphonie     : 16 voix
+Overbridge     : Oui (16 canaux audio)
+
+--- ÉVOLUTION vs DT1 ---
+
+• Passage à 16 pistes (8 audio + 8 MIDI)
+• Effets insert par piste (Tonverk-powered)
+• 2 LFO par piste (vs 1 sur DT1)
+• Effets send + effets de bus + mix FX
+• Base-Width Filter + Multi-Mode Filter + Lowpass 4
+• Per-track Digital Overdrive / Bit Reduction / Sample Rate Reduction
+
+--- FILTRES PAR PISTE ---
+
+  • Base-Width Filter — fixe, contrôle spectral fin
+  • Multi-Mode Filter — LP / HP / BP / Notch /... (mêmes specs que Syntakt)
+  • Lowpass 4 — 4-pole ladder (modèle Moog-style)
+  • Comb- / Comb+ — resonateurs (feedback négatif/positif)
+  • Legacy LP / HP — filtres classiques du DT1
+  • Equalizer — paramétrique
+
+--- EFFETS INSERT (par piste) ---
+
+  • Digital Overdrive
+  • Bit Reduction (BR + Sample Rate Reduction combiné)
+  • Sample Rate Reduction
+
+--- EFFETS SEND ---
+
+  • Saturator Delay — delay + saturation dans la boucle
+  • Supervoid Reverb — grande réverbération FDN
+  • Panoramic Chorus — chorus stéréo
+
+--- EFFETS DE BUS (pistes 9-12) ---
+
+  • 2 slots d'effets par bus
+
+--- NOTES FAUST DT2 ---
+
+• Les filtres et effets insert sont les mêmes que Tonverk.
+• Voir section Tonverk ci-dessous pour chaque effet.
+• Architecture : Track → Insert FX → Filter → Amp → Sends → Bus → Mix
+• 2 LFO par piste + 1 ADSR Filter + 1 ADSR Amp
+
+
+======================================================================
+3.  ELEKTRON TONVERK  (19 modules d'effets)
+======================================================================
+
+Plate-forme d'effets utilisée dans : Digitakt II, Syntakt, Digitone II.
+Chaque module a 8 paramètres (sauf mention contraire).
+
+--- 3.1  CHRONO PITCH (Pitch Shifting indépendant du temps) ---
+
+  Param  | Description
+  -------|------------
+  TUNE   | Pitch shift amount (semitones/cents)
+  WIN    | Taille de la fenêtre grain
+  FDBK   | Feedback (régénération)
+  DEP    | Modulation depth
+  HPF    | High-pass filter cutoff (post-pitch)
+  LPF    | Low-pass filter cutoff (post-pitch)
+  SPD    | Modulation speed
+  MIX    | Wet/dry mix
+
+  FAUST : Granular pitch shifter.
+          Overlap-add avec fenêtrage Hann.
+          Taille fenêtre = WIN, recouvrement 50-75%.
+          Pitch = modification de la vitesse de lecture grain.
+          Filtres HPF/LPF en série après pitch.
+
+--- 3.2  COMB ± FILTER (Résonateurs) ---
+
+  Param  | Description
+  -------|------------
+  SPD    | LFO speed
+  DEP    | LFO depth
+  SPH    | Phase offset LFO
+  DTUN   | Detuning amount
+  FREQ   | Fréquence du peigne
+  FDBK   | Feedback (+ ou - selon mode)
+  LPF    | Filtre passe-bas dans feedback
+  MIX    | Wet/dry mix
+
+  FAUST : fi.comb(freq, feedback) ou delay manuel.
+          Comb+ = feedback positif, Comb- = feedback négatif.
+          LPF dans feedback = contrôle de brillance des résonances.
+          LFO sur FREQ pour effet flanger/peigne modulé.
+
+--- 3.3  COMPRESSOR ---
+
+  Param  | Description
+  -------|------------
+  THR    | Threshold (dB)
+  ATK    | Attack time
+  REL    | Release time
+  MUP    | Make-up gain
+  RAT    | Ratio (1.5:1 à 20:1)
+  SCS    | Sidechain source
+  SCF    | Sidechain filter
+  (2 paramètres additionnels — total 8)
+
+  FAUST : Compresseur feedforward.
+          Envelope follower sur sidechain input.
+          Soft-knee (voir implémentation ci-dessous).
+
+          **Soft-knee implementation (no ternary):**
+            TLin = db2linear(threshold)
+            KdB  = knee * 20
+            over = env - TLin + KdB/2
+            posOver = max(over, 0.0)
+            GRdB   = (posOver^2) / (2 * KdB * (ratio - 1.0))
+            gainRed = db2linear(-GRdB)
+            compressed = band * gainRed
+
+--- 3.4  DAISY DELAY ---
+
+  Param  | Description
+  -------|------------
+  DRV    | Drive/saturation (pré-delay)
+  TIME   | Delay time
+  FDBK   | Feedback
+  WIDH   | Stereo width
+  MOD    | Modulation depth
+  SKEW   | L/R time offset (ping-pong character)
+  FILT   | Filter tone (dark ↔ bright)
+  (MIX?) |
+
+  FAUST : de.delay(input, maxTime, time) + maths.tanh(drive) en entrée.
+          SKEW = différence de temps entre L et R (ping-pong).
+          Cross-feedback L↔R pour la largeur stéréo.
+          FILT = fi.lowpass/fi.highpass dans boucle feedback.
+
+--- 3.5  DEGRADER (Bitcrusher + SRR + Freeze) ---
+
+  Param  | Description
+  -------|------------
+  BR     | Bit reduction (16→1 bits)
+  OVER   | Oversampling
+  SRR    | Sample rate reduction (÷ N)
+  DROP   | Sample dropping probability
+  RATE   | Sample dropping rate
+  DEP    | Modulation depth
+  FREZ   | Freeze toggle (ON/OFF)
+  F.TIM  | Freeze timestamp
+
+  FAUST : BR  = int(signal * 2^(16-bits)) / 2^(16-bits)
+          SRR = échantillonnage tous les N samples (downsample + hold)
+          DROP = random drop avec probabilité variable
+          Freeze = buffer circulaire : quand FREZ=ON, lecture bouclée
+                   du contenu à F.TIM.
+
+--- 3.6  DIRTSHAPER (Saturation/Distortion) ---
+
+  Param  | Description
+  -------|------------
+  DRV    | Drive amount
+  RECT   | Rectification amount (mix wavefolding)
+  HPF    | High-pass filter cutoff
+  LPF    | Low-pass filter cutoff
+  NOIS   | Noise mix amount
+  N.FRQ  | Noise filter frequency
+  N.RES  | Noise filter resonance
+  MIX    | Wet/dry mix
+
+  FAUST : Waveshaping : maths.tanh(signal * drive) + abs() pour rect.
+          Noise : no.noise → fi.resonbp(freq, Q) → mixé avant/après sat.
+          HPF+LPF = filtre en série post-saturation.
+
+--- 3.7  FILTERBANK (8 bandes fixes) ---
+
+  Band  | Fréquence | Type
+  ------|-----------|-------
+  A     | 90 Hz     | LPF
+  B     | 121.9 Hz  | BPF
+  C     | 224.8 Hz  | BPF
+  D     | 418 Hz    | BPF
+  E     | 777.4 Hz  | BPF
+  F     | 1445.8 Hz | BPF
+  G     | 2688.6 Hz | BPF
+  H     | 4 kHz     | HPF
+
+  FAUST : 8 filtres parallèles.
+          dm.analyzer_rev(3, fLow, fHigh) — ou manuel.
+          Chaque bande a un gain indépendant.
+          Sommation après filtrage.
+
+--- 3.8  FREQUENCY WAPER (Spectral Warping) ---
+
+  Param  | Description
+  -------|------------
+  SPD    | Modulation speed
+  DEP    | Modulation depth
+  SPH    | Phase offset
+  LAG    | Lag/smoothing
+  SHFT   | Frequency shift amount
+  SPRD   | Spread width
+  SBND   | Band selection
+  MIX    | Wet/dry mix
+
+  FAUST : FFT-based spectral processing.
+          Shift bins = décalage circulaire dans le domaine fréquentiel.
+          SPRD = élargissement du shift sur plusieurs bins.
+          SBND = sélection de la bande à traiter.
+          Overlap-add obligatoire.
+
+--- 3.9  INFINITE FLANGER ---
+
+  Param  : SPD, DEP, TUNE + modulations
+  FAUST  : Delay modulé par LFO.
+           High feedback crée la résonance "infinite".
+           de.flanger ou comb filter modulé.
+
+--- 3.10 LOW-PASS FILTER ---
+  Filtre LPF standard avec cutoff + résonance. Par piste.
+
+--- 3.11 MULTIMODE FILTER ---
+  LP / HP / BP / Notch. Par piste.
+
+--- 3.12 PANORAMIC CHORUS ---
+  Chorus stéréo avec contrôle de largeur.
+  FAUST : delay LFO modulé, phase offset L/R.
+
+--- 3.13 PHASE 98 (98-stage phaser) ---
+  98 allpass stages. Plus lisse que les phasers classiques.
+  FAUST : cascade de fi.allpass(ap_delay, ap_gain) avec LFO.
+
+--- 3.14 RUMSKLANG REVERB  (room sound) ---
+  Réverb "room" chaude. Intime.
+  FAUST : reverbplate ou FDN court.
+
+--- 3.15 STEEL BOX REVERB ---
+  Réverb métallique / cuvette. Réflexions courtes, résonant.
+  FAUST : réseau d'allpass avec temps de delay courts (fe.back).
+
+--- 3.16 SUPERVOID REVERB ---
+
+  Param  | Description
+  -------|------------
+  PRE    | Pre-delay
+  DEC    | Decay time
+  FREQ   | Shelving filter frequency
+  GAIN   | Shelving filter gain
+  HPF    | High-pass filter (entrée)
+  LPF    | Low-pass filter (entrée)
+  MIX    | Wet/dry mix
+
+  FAUST : FDN (Feedback Delay Network).
+          Shelving filter = fi.lowshelf / fi.highshelf dans boucles.
+          8 à 16 delay lines parallèles avec matrices de feedback.
+          HPF+LPF en entrée = coloration avant reverb.
+
+--- 3.17 WABLE (Lo-Fi Tape Vibrato) ---
+
+  Param  | Description
+  -------|------------
+  SPEED  | LFO speed
+  DEP    | LFO depth
+  BASE   | Base pitch offset
+  WIDTH  | Stereo width
+  N.LEV  | Noise level (tape hiss)
+  N.HPF  | Noise high-pass filter
+  STEREO | Stereo spread
+  MIX    | Wet/dry mix
+
+  FAUST : LFO (sin/tri) → modulation delay line.
+          Pitch offset = delay offset statique.
+          Noise = no.pink_noise → fi.highpass → mixé.
+          Stéréo = LFO L/R déphasé.
+
+--- ARCHITECTURE TONVERK ---
+
+  • Bus FX (Tracks 9-12) : 2 slots d'effets par bus
+  • Send FX (Tracks 13-15) : 1 slot par send
+  • Mix FX (Track 16) : 1 slot
+
+
+======================================================================
+4.  ELEKTRON SYNTAKT  (12 + 1 pistes, Analog + Digital)
+======================================================================
+
+Architecture à 3 niveaux d'effets.
+
+--- SIGNAL FLOW ---
+
+  Track Sound → +DRIVE → Filter → AMP → Sends → Main Mix
+                                            ↓
+                                    Analog FX Block (optionnel)
+                                            ↓
+                                    Delay / Reverb (send)
+
+--- +DRIVE (Analogique, par piste) ---
+  Drive 0-11. Saturation analogique simulée.
+  FAUST : ef.cubicnl(drive, offset) ou custom waveshaper.
+
+--- FILTRE MULTIMODE (par piste) ---
+
+  Param  | Description
+  -------|------------
+  FREQ   | Cutoff
+  RESO   | Résonance
+  TYPE   | LP4 / LP2 / BP / HP / Notch / Double-Notch / LP-Notch / OFF
+  ATK    | Attack ADSR filtre
+  DEC    | Decay ADSR filtre
+  SUS    | Sustain ADSR filtre
+  REL    | Release ADSR filtre
+  ENV    | Envelope depth (bipolaire)
+  DEL    | Delay avant attack
+  FENR   | Envelope reset (ON/OFF)
+  FPAN   | Freq pan L/R (bipolaire)
+
+  FAUST : fi.svf (multi-mode intégré).
+          L'enveloppe filtre est une ADSR classique.
+          FPAN = deux filtres L/R avec offset de coupure différent.
+          Double-Notch = deux notch en série.
+
+--- BASE-WIDTH FILTER (pistes numériques uniquement) ---
+  Filtre spectral fin. Fixe, pas de paramètres.
+
+--- PARAMETRIC EQ (pistes numériques) ---
+
+--- AMP ---
+
+  Param  | Description
+  -------|------------
+  ATK    | Attack enveloppe amplitude
+  HOLD   | Hold (0-126 ou NOTE)
+  DEC    | Decay
+  SUS    | Sustain (mode ADSR)
+  REL    | Release (mode ADSR)
+  DEP    | Depth (mode AHD)
+  DEL    | Send Delay
+  REV    | Send Reverb
+  PAN    | Panorama (L64-R63)
+  VOL    | Volume track
+  AENR   | Reset enveloppe
+  MODE   | AHD inversée / AHD / ADSR
+  ROUT   | Routage FX Block (PRE/POST)
+
+  FAUST : AHD inversée = amplitude monte puis descend, pas de sustain.
+          Parfait pour percussions.
+
+--- LFO (x2 par piste) ---
+
+  Param  | Description
+  -------|------------
+  SPD    | Speed (BPM sync: 8, 16, 32)
+  MULT   | Multiplicateur
+  FADE   | Fade in/out (bipolaire)
+  DEST   | Destination
+  WAVE   | Tri / Sin / Sqr / Saw / Random / Exp / Ramp
+  SPH    | Phase de départ (0-64)
+  MODE   | FREE / TRIG / HOLD / ONE / HALF
+  DEP    | Depth (bipolaire, -64 à +63)
+
+  FAUST : ONE = LFO lance un cycle puis s'arrête.
+          HALF = s'arrête à la moitié du cycle.
+          Utile pour modulations unidirectionnelles (enveloppe-like).
+
+--- ANALOG FX BLOCK ---
+  Insertion globale, routable par piste.
+  Contient : Drive analogique + Multimode Filter + Amplificateur.
+  Routage PRE/POST par piste.
+
+--- DELAY (send) ---
+
+  Param  | Description
+  -------|------------
+  TIME   | Temps (sync BPM, 1/128 à 1/2 + triplets + dotted)
+  X      | Ping-pong ON/OFF
+  WID    | Largeur stéréo (bipolaire)
+  FDBK   | Feedback (0-198, peut aller en infini)
+  HPF    | High-pass sur feedback
+  LPF    | Low-pass sur feedback
+  REV    | Send vers Reverb
+  VOL    | Volume
+
+  FAUST : de.delay avec ba.time pour sync BPM.
+          HPF/LPF dans feedback = contrôle du ton des répétitions.
+          Ping-pong = cross-feedback L/R avec signe opposé.
+
+--- REVERB (send) ---
+
+  Param  | Description
+  -------|------------
+  PRE    | Pre-delay
+  DEC    | Decay (1-127, INF)
+  FREQ   | Shelving filter freq (feedback damping)
+  GAIN   | Shelving filter gain
+  HPF    | High-pass input
+  LPF    | Low-pass input
+  VOL    | Volume
+
+  FAUST : FDN reverb + shelving filter(s) dans feedback.
+          Decay INF = feedback ≥ 1.0 en FDN.
+          Shelving = fi.lowshelf / fi.highshelf.
+
+
+======================================================================
+5.  ELEKTRON DIGITONE  (Synthé FM 4-op)
+======================================================================
+
+Architecture FM pure avec sends. PAS d'Analog FX Block.
+
+--- SIGNAL FLOW ---
+
+  FM Engine (4-op) → Overdrive → Multimode Filter
+    → Base-Width Filter → AMP → Sends
+                                  ↓
+                        Chorus / Delay / Reverb
+
+--- FM ENGINE (4 opérateurs) ---
+  8 algorithmes (routages FM).
+  Ratios A, B, C (multiplicateurs de fréquence).
+  Harmonics (ajout de partiels, bipolaire).
+  Feedback par opérateur.
+  Mix X/Y (crossfade entre 2 carriers).
+  Detune.
+  Enveloppes A et B (ADE/ASDE avec end level).
+
+  FAUST : fm.fm(algorithm, ratios, feedbacks)
+          ou construction manuelle : os.osc → * → os.osc
+          Enveloppes AD ou ASR par opérateur.
+
+--- CHORUS (unique au Digitone) ---
+
+  Param  | Description
+  -------|------------
+  DPTH   | LFO depth
+  SPD    | LFO speed
+  HPF    | Input high-pass (évite de chorusser les basses)
+  WDTH   | Largeur stéréo
+  DEL    | Send vers Delay
+  REV    | Send vers Reverb
+
+  FAUST : Chorus stéréo avec LFO décalé L/R.
+          HPF en entrée = clarté préservée dans le bas du spectre.
+
+--- DELAY ---  Mêmes paramètres que Syntakt.
+--- REVERB ---  Mêmes paramètres que Syntakt.
+
+--- MASTER ---
+  MOVD = Master Overdrive (distortion finale sur mix complet).
+  FAUST : Saturation globale avec ef.cubicnl ou maths.tanh.
+
+
+======================================================================
+6.  TORSO ELECTRONICS  (S-4 / T-1 / TS-1)
+======================================================================
+
+TORSO S-4 : "Sculpting Sampler" — 4 pistes stéréo.
+Chaque piste a une chaîne de 5 devices en série.
+
+--- SIGNAL FLOW ---
+
+  Material → Granular → Filter → Color → Space → Mixer
+   (src)     (grains)   (48band) (dist)  (D+R)   (mix)
+
+--- CHAÎNE PAR PISTE (5 devices) ---
+
+1) MATERIAL – Sampleur
+   - Playback depuis mémoire interne
+   - Enregistrement et overdub
+   - Polyphonique 8 voix MIDI
+   - Mode tape machine (4 pistes)
+   FAUST : rdtable / rwtable pour lecture variable.
+
+2) GRANULAR – Granulaire (cœur novateur)
+   - Contour des grains (enveloppe)
+   - Taille des grains
+   - Pitch des grains
+   - Textures ambiantes → rythmiques
+   FAUST :
+     • Buffer circulaire avec pointeur lecture variable
+     • Fenêtrage : enveloppe * signal
+     • Pitch = modif vitesse lecture grain
+     • Taille grain = durée fenêtre
+     • Grains superposés (overlap)
+     • rwtable pour lectures multiples parallèles
+
+3) FILTER – Filtre 48 bandes
+   - 48-band resonant filter bank
+   - Modèles de filtres classiques
+   - Modes de morphing
+   FAUST : dm.analyzer_rev ou 48 BPF parallèles.
+           Le morphing = interpolation entre profils de fréquence.
+
+4) COLOR – Caractère (Dual-band)
+   - Distortion dual-band
+   - Bit reduction
+   - Compression
+   - Noise
+   FAUST :
+     Dual-band = split LR4 → 2 bandes, distortion séparée, recombine.
+     Bit reduction : int(x * 2^bits) / 2^bits
+     Compression : envelope follower + GR
+     Noise : no.noise → mixé avant/après dist.
+
+5) SPACE – Espace (Delay + Reverb + Freeze)
+   - Delay stéréo types multiples
+   - Reverb
+   - Freeze (boucle sur buffer)
+   FAUST :
+     Freeze = buffer circulaire taille fixe.
+              Quand freeze=ON : boucle buffer au lieu de l'entrée.
+     Delay classique = lecture avec retard.
+     Reverb = FDN ou allpass en réseau.
+
+--- MODULATION (S-4) ---
+   4 modulateurs par piste : LFOs, Enveloppes, Random, Envelope Followers.
+   Tous paramètres modulables via matrice de routage.
+
+   FAUST : Table de routage source→destination.
+           Envelope follower = dm.rms_follower_ar(atk, rel) → modulateur.
+
+--- MIXER ---
+   4 canaux stéréo.
+   Filtres style DJ par piste.
+   Master Compressor.
+   12 macros (8 sliders + 4 punch-in FX).
+
+--- SCENES ---
+   128 scènes. Snapshots de paramètres + samples.
+   MIDI Program Change.
+
+TORSO T-1  (Algorithmic Sequencer / Eurorack)
+  • 8 pistes CV/Gate + MIDI
+  • Algorithmes génératifs (Markov, Euclidean, Random Walk)
+  • 8 slots d'effets internes (reverb, delay, bitcrush)
+  • FX : Reverb / Delay / Bitcrush / Filter / Compressor
+  FAUST : Les effets sont classiques (delay, reverb, etc).
+          L'intérêt est surtout le séquencement algorithmique.
+
+TORSO TS-1  (Desktop Sequencer)
+  • Version desktop du T-1
+  • 8 pistes MIDI + CV
+  • Algorithmes similaires
+  • Effets plus limités
+  FAUST : Même approche que T-1 pour les effets.
+
+
+======================================================================
+7.  YAMAHA SY SERIES  (FM + AWM + Vector)
+======================================================================
+
+--- 7.1  SY77 / TG77 (1990) ---
+
+  Synthèse   : AFM (Advanced FM, 6-op, 45 algo) + RCM + AWM2
+  Polyphonie : 16 voix (dynamique)
+  Filtre     : Résonant numérique multimode (LPF, HPF, BPF, BEF, THRU)
+  Effets     : Dual processors indépendants (insert/send, 48 types)
+  LFOs       : 2 par voix
+  Clavier    : 61 touches, velocity + aftertouch
+
+  RCM = Convolution Modulation — waveshaper par convolution appliqué
+        au signal FM ou AWM. C'est la feature la plus distinctive.
+        Applique un spectre de convolution pour modifier le timbre.
+
+  FAUST :
+    • 6-op FM : 5 modulateurs + 1 carrier (ou arbre complexe).
+    • RCM : Convolution avec une table de spectre.
+            an.amp_conv ~ convolution FFT.
+    • Filtre multimode résonant : fi.svf.
+    • Dual FX processors : 2 unités en série ou parallèle.
+
+--- 7.2  SY99 / TG500 (1991) ---
+
+  Synthèse   : AFM + RCM + AWM2 (16-bit, samples utilisateur)
+  Polyphonie : 16 voix
+  Filtre     : Multimode résonant amélioré (plus agressif que SY77)
+  Effets     : Dual processors, algorithmes étendus
+
+  Évolution SY77 → SY99 :
+    • Samples 16-bit utilisateur (via floppy/SIMM)
+    • Samples comme opérateurs FM
+    • Filtre plus agressif/chaud
+    • Samples intégrés dans les algorithmes FM
+
+  FAUST :
+    • Mêmes bases FAUST que SY77.
+    • Ajout : sample playback comme opérateur FM.
+    • Le filtre SY99 est plus agressif — plus de drive/saturation.
+    • Option RCM + sample = convolution cross-synth.
+
+--- 7.3  SY85 (1992) ---
+
+  Synthèse   : AWM2 (sample playback 16-bit)
+  Polyphonie : 30 voix (la plus élevée de la série SY)
+  Filtre     : Multimode résonant numérique (LPF, HPF, BPF, BEF)
+  Effets     : Dual processors + Reverb dédiée, 40 types
+  LFOs       : 2 par voix
+  Clavier    : 61 touches, velocity + aftertouch
+
+  Pure sample-based subtractive. Pas de FM.
+  30 voix = avantage pour les nappes/pads.
+
+  FAUST :
+    • Sample playback + filtre multimode.
+    • 2 LFO + 1 ADSR par voix.
+    • Effets : delay / chorus / reverb / distortion / EQ / rotary
+    • Architecture simple : Sample → Filter → Amp → FX
+
+--- 7.4  SY22 / TG33 (1990) ---
+
+  Synthèse   : Vector Synthesis + AWM + 2-op FM
+  Polyphonie : 16 notes
+  Filtre     : LPF numérique — PAS DE RÉSONANCE !
+  Effets     : Reverb + Chorus seulement
+  Joystick   : Vector joystick (4-way crossfade) — CŒUR DU SYNTHÉ
+
+  Vector Synthesis = crossfade continu entre 2 sources AWM et 2 sources FM.
+  Le joystick contrôle le mix des 4 sources en temps réel.
+
+  ATTENTION : Pas de résonance au filtre. Limitation majeure.
+
+  FAUST :
+    • 4 sources : 2 AWM + 2 FM.
+    • Crossfade vector = interpolateur quadri-dimensionnel.
+    • Joystick → (X, Y) → 4 poids de mix.
+    • Filtre : fi.lowpass sans résonance (fi.lowpass(1, freq)).
+    • Effets simples : reverb + chorus.
+
+--- 7.5  SY35 (1992) ---
+
+  Synthèse   : Vector Synthesis + AWM + 2-op FM
+  Polyphonie : 16 notes
+  Filtre     : LPF résonant numérique (évolution du SY22)
+  Effets     : Reverb + Chorus + Delay + EQ
+  Joystick   : Vector joystick (identique SY22)
+
+  Même cœur vector que le SY22, mais AVEC résonance au filtre.
+  Effets étendus (delay + EQ ajoutés).
+
+  FAUST :
+    • Identique SY22 + filtre résonant (fi.resonlp).
+    • Delay et EQ supplémentaires.
+
+--- 7.6  SY55 (1989) ---
+
+  Synthèse   : AWM1 (sample playback 12-bit)
+  Polyphonie : 16 voix
+  Filtre     : LPF numérique résonant
+  Effets     : Dual processors numériques
+  Clavier    : 61 touches, velocity
+
+  12-bit = son lo-fi caractéristique.
+  Premier de la série SY (avant le SY77).
+  Samples 12-bit = grain audible, recherché pour le côté gritty.
+
+  FAUST :
+    • Sample playback 12-bit simulé :
+      int(sample * 2^12) / 2^12  (réduction de bits)
+    • Filtre LPF résonant.
+    • Dual FX processors.
+    • Le bruit de quantification 12-bit est une feature, pas un bug.
+
+--- COMPARAISON SY SERIES ---
+
+  Modèle | Synthèse         | Poly | Filtre rés. | Effets         | Particularité
+  -------|------------------|------|-------------|----------------|--------------
+  SY55   | AWM1 (12-bit)    | 16   | Oui         | Dual proc      | Gritty lo-fi
+  SY77   | AFM+RCM+AWM2     | 16   | Oui         | Dual proc, 48  | Convolution (RCM)
+  SY99   | AFM+RCM+AWM2+Usr | 16   | Oui+(aggro) | Dual proc (ext)| Samples user
+  SY85   | AWM2             | 30   | Oui         | Dual+Reverb,40 | Haute polyphonie
+  SY22   | Vector+AWM+2FM   | 16   | NON (!!!)   | Rev+Chorus     | Vector joystick
+  SY35   | Vector+AWM+2FM   | 16   | Oui         | Rev+Chor+Del+EQ| Resonance ajoutée
+
+--- SY RACKS EQUIVALENTS ---
+  TG77  = version rack du SY77
+  TG500 = version rack du SY99
+  TG33  = version rack du SY22
+  TG55  = version rack du SY55
+
+--- NOTES FAUST GÉNÉRALES SY ---
+
+  • Architecture multi-timbral : implémenter plusieurs voix en parallèle.
+  • Les effets étaient en DSP externe (Yamaha FX chips). En FAUST,
+    on peut aller plus loin que les originaux.
+  • RCM (SY77/99) = convolution avec une table fixe. En FAUST,
+    an.amp_conv_fixed(taille, table) ou an.amp_conv.
+  • Vector synthesis (SY22/35) = crossfade 4 sources.
+    En FAUST : wi.crossfade(4) ou interpolations manuelles.
+  • Le filtre SY99 est réputé plus agressif. Ajouter saturation
+    avant ou après le filtre pour l'émuler.
+
+
+======================================================================
+8.  FAUST OPERATORS ESSENTIALS
+======================================================================
+
+  Besoin                 | Opérateur FAUST
+  -----------------------|----------------------------------------------
+  Filtre LPF             | fi.lowpass(N, freq)
+  Filtre HPF             | fi.highpass(N, freq)
+  Filtre BPF             | fi.bandpass(N, freq, Q)
+  Filtre SVF (multi)     | fi.svf(freq, q, mode)
+  Filtre résonant        | fi.resonlp(freq, Q) / fi.resonhp(freq, Q)
+  Filtre peigne          | fi.comb(freq, feedback)
+  Filtre notch           | fi.notch(freq, Q)
+  Filtre shelving        | fi.lowshelf(freq, gain) / fi.highshelf(freq, gain)
+  Filtre allpass         | fi.allpass(delay, gain)
+  Crossover              | dm.analyzer_rev(bands, fLow, fHigh)
+  Distortion cubic       | ef.cubicnl(drive, offset)
+  Waveshaping            | maths.tanh(signal * drive)
+  Rectification          | abs(signal)
+  Delay                  | de.delay(input, maxTime, time)
+  Delay fractionnaire    | fdelay(N, input, time)
+  Reverb (FDN)           | re.stereo_fdn_demo
+  Reverb (plate)         | reverbplate
+  Flanger                | de.flanger(input, delay, speed, depth)
+  Chorus                 | de.chorus(input, delay, speed, depth)
+  LFO                    | os.osc(waveform, freq) / lf_lfo(waveform, freq)
+  Enveloppe ADSR         | en.adsr(atk, dec, sus, rel, gate)
+  Enveloppe follower     | dm.rms_follower_ar(atk, rel)
+  Sample reader          | rdtable(table, index)
+  Sample writer          | rwtable(table, index, value)
+  Noise (white)          | no.noise
+  Noise (pink)           | no.pink_noise
+  Dry/Wet mix            | ef.drywet(dry, wet, mix)
+  BPM sync               | ba.time(BPM)
+  Smooth control         | si.smoo
+  dB to linear           | ba.db2linear(dB)
+  Linear to dB           | ba.linear2db(linear)
+  Crossfade              | wi.crossfade(source1, source2, xfade)
+  Convolution            | an.amp_conv(table, signal)
+  Select                 | select2(selector, a, b)
+  FM synthesis           | os.osc(freq * ratio) → os.osc(freq) (manuel)
+
+
+======================================================================
+9.  FAUST PATTERNS & PITFALLS
+======================================================================
+
+--- SOFT-KNEE COMPRESSION (no ternary) ---
+
+  TLin = ba.db2linear(threshold)
+  KdB  = knee * 20
+  over = env - TLin + KdB/2
+  posOver = max(over, 0.0)
+  GRdB   = (posOver * posOver) / (2.0 * KdB * (ratio - 1.0))
+  gainRed = ba.db2linear(-GRdB)
+  compressed = band * gainRed
+
+--- LOOK-AHEAD COMPRESSION ---
+
+  delayed = signal @ int(ma.SR * lookAheadMs / 1000)
+  env = dm.rms_follower_ar(atk, rel) : delayed
+  → le compresseur réagit avant la transient
+
+--- FEEDBACK LOOP (mb~fb style) ---
+
+  fbAmt = ffb * 2          // maps 0-1 → 0-2
+  delaySamps = int(ma.SR * ddelMs / 1000)
+  feedback = madeUp * fbAmt @ delaySamps
+  output = madeUp + feedback
+
+--- FREEZE BUFFER ---
+
+  bufferSize = int(ma.SR * bufferSec)
+  buffer = rwtable(size, idx)
+  // Si freeze ON : lecture bouclée
+  // Si freeze OFF : écriture normale + passthrough
+  readIdx = select2(freeze, writeIdx, loopIdx)
+  output = rdtable(buffer, readIdx)
+
+--- DUAL-BAND PROCESSING ---
+
+  // Split avec crossover LR4
+  // low = dm.analyzer_rev(2, fLow, fHigh) band 0
+  // high = dm.analyzer_rev(2, fLow, fHigh) band 1
+  // Traitement indépendant low/high
+  // Mix = lowProcessed + highProcessed
+
+--- VECTOR SYNTHESIS CROSSFADE ---
+
+  // Joystick (X, Y) → 4 poids W1, W2, W3, W4
+  // W1 = (1-X)*(1-Y)  — top-left
+  // W2 = X*(1-Y)      — top-right
+  // W3 = (1-X)*Y      — bottom-left
+  // W4 = X*Y          — bottom-right
+  // output = src1*W1 + src2*W2 + src3*W3 + src4*W4
+
+--- PING-PONG DELAY ---
+
+  leftOut  = de.delay(leftIn  + rightIn * -feedback, maxTime, time)
+  rightOut = de.delay(rightIn + leftIn  * -feedback, maxTime, time)
+
+--- PITFALLS ---
+
+  ❌ Utiliser ? (ternaire) → erreur de parsing FAUST
+     ✅ Remplacer par max/min ou select2(selector, a, b)
+
+  ❌ Oublier le cast int() sur les delays
+     ✅ delaySamps = int(ma.SR * delayMs / 1000)
+
+  ❌ Pas de smoothing sur les hslider → zipper noise
+     ✅ hslider(...) : si.smoo
+
+  ❌ Oublier les conversions dB ↔ linear
+     ✅ ba.db2linear(dB) / ba.linear2db(linear)
+
+  ❌ Fractional delay @ sans cast
+     ✅ @ int(...)
+
+  ❌ import sans lib disponible
+     ✅ Vérifier avec faust -lb list
+
+======================================================================
+10.  WHAT FAUST CAN DO THAT THESE MACHINES CAN'T
+======================================================================
+
+  1. Modulation matrix libre — n'importe quelle source → n'importe
+     quelle destination (Torso S-4 en a 4/piste, mais en FAUST c'est
+     illimité).
+
+  2. Granular + Filter Bank + Freeze dans une seule chaîne.
+
+  3. Dual-band processing avec contrôle indépendant par bande
+     (S-4 a du dual-band dans Color, mais en FAUST on fait N-bandes).
+
+  4. Envelope followers comme modulateur partout
+     (S-4 les a, pas les Elektron).
+
+  5. Morphing continu entre types de filtres.
+
+  6. Macro system — un seul contrôle affecte N paramètres.
+
+  7. Scene snapshots avec save/recall.
+
+  8. FFT spectral processing avancé (Frequency Warper, vocoder, etc).
+
+  9. Convolution créative (RCM-like mais flexible).
+
+  10. Synthèse vectorielle + FM + sample crossfade combinés
+      (comme SY22/35 mais avec plus de sources).
+
+
+======================================================================
+7.  ELEKTRON OCTATRACK  (MK1 / MK2)
+======================================================================
+
+8 pistes stéréo sampler + 8 pistes MIDI.
+Architecture unique basée sur le Flex/Static machine system.
+
+--- SIGNAL FLOW (par piste) ---
+
+  Sample Playback (FLEX or STATIC)
+    → Filter (LP/HP/BP/BR)
+    → Amplifier (Volume + Pan)
+    → Track FX (1 slot x 12 types)
+    → Mixer
+    → Cue Bus A / Cue Bus B / Master
+    → Master FX 1-2-3 (global)
+
+--- PISTES ---
+
+  Type     | Description
+  ---------|------------
+  FLEX     | Sample RAM, time-stretch + pitch-shift + retrig
+  STATIC   | Sample direct-from-CF, lecture brute (lo-fi)
+  NEIGHBOUR| Machine de voisinage — lit la piste adjacente
+  PICKUP   | Sample avec point de départ variable
+  MIDI     | Pas de sample, juste sortie MIDI (notes + CC)
+
+--- TIME-STRETCH / PITCH-SHIFT (Flex uniquement) ---
+
+  Param  | Description
+  -------|------------
+  SPEED  | Vitesse lecture (bipolaire, 0=arrêt)
+  LEN    | Durée cible (stretch)
+  PITCH  | Pitch shift (-24 à +24 demi-tons)
+  LFO    | Modulation de pitch
+  FINE   | Fine tune
+
+  FAUST : Time-stretch = fenêtrage OLA avec recouvrement.
+          Pitch-shift = grain playback speed modifié.
+          Combiner speed*length pour ratio de stretch.
+
+--- FILTRE MULTIMODE (par piste) ---
+
+  Param  | Description
+  -------|------------
+  FREQ   | Cutoff
+  RESO   | Résonance
+  TYPE   | LP4 / LP2 / HP / BP / BR / OFF
+
+  FAUST : fi.svf(FREQ, RESO, mode) — 6 modes.
+
+--- AMPLIFIER (par piste) ---
+
+  VOL   | Volume
+  PAN   | Panorama
+  AMP   | Envelope amount (de l'enveloppe d'amplitude)
+
+--- TRACK FX (1 slot par piste, 12 types) ---
+
+  Type     | Description
+  ---------|------------
+  DELAY    | Delay tempo-sync, feedback, ping-pong
+  REVERB   | Reverb avec couleur (dark/bright)
+  REV+DEL  | Combinaison reverb + delay sérielle
+  CHORUS   | Chorus stéréo
+  FLANGER  | Flanger avec feedback résonant
+  PHASER   | Phaser à étages
+  SATURN   | Saturation/distorsion
+  LOFI     | Bitcrush + sample rate reduction
+  COMB±    | Filtre peigne (feedback ±)
+  EQ       | EQ paramétrique (LOW / MID / HIGH)
+  FILTER   | Filtre multimode (2e slot possible)
+  COMP     | Compresseur
+
+  Chaque effet a 4 paramètres (knobs A-B-C-D selon type).
+  Mapping des knobs dépend du type d'effet.
+
+  FAUST :
+    • Delay     : de.delay(input, max, time), HPF+LPF dans feedback
+    • Reverb    : FDN (re.stereo_fdn_demo) avec filtre damping
+    • Chorus    : delay+LFO modulé, L/R déphasé
+    • Flanger   : comb filter modulé, feedback élevé
+    • Phaser    : 4-16 allpass stages, LFO modulé
+    • Saturn    : maths.tanh(drive) + wavefold
+    • LOFI      : int(x*2^bits)/2^bits + downsample hold
+    • Comb±     : fi.comb(freq, fb) avec signe inversible
+    • EQ        : fi.lowshelf / fi.highshelf / fi.peq
+    • Filter    : fi.svf (redondant avec le filtre track)
+    • Comp      : envelope follower + gain reduction
+
+--- LFOs (2 par piste) ---
+
+  2 LFOs assignables, multi-wave.
+  5 modes de trigger (FREE, TRIG, HOLD, ONE, HALF).
+
+  Param  : SPD / MULT / FADE / DEST / WAVE / SPH / MODE / DEP
+
+  FAUST : Mêmes patterns que Syntakt LFOs.
+
+--- MASTER FX (3 slots globaux) ---
+
+  FX1-2-3 : n'importe quel effet du catalogue.
+  Routing : FX1 → FX2 → FX3 en série.
+
+--- CROSSFADER ---
+
+  Crossfade entre Cue Bus A et Cue Bus B.
+  Permet le mixage/scratche entre deux groupes de pistes.
+  Assignable par piste (A / Off / B).
+
+  FAUST : wi.crossfader(a, b, mix)
+          mix 0→1 = A→B.
+
+--- PARAM LOCKS (P-Locks) ---
+
+  Chaque pas de sequencer peut lock n'importe quel paramètre
+  de la piste (filtre, volume, pitch, effets, LFOs...).
+
+  FAUST : Parameter automation via table de séquence.
+          Une lock table = array 64 steps × N params.
+
+--- DIFFÉRENCES MK1 vs MK2 ---
+
+  MK1 | MK2
+  ----|----
+  64 MB RAM           | 128 MB RAM
+  Sorties 2x mono     | 4 sorties stéréo (8 voies)
+  CF card             | SD card
+  Pas d'Overbridge    | Overbridge
+  Même architecture FX| Mêmes FX (identique)
+
+  FAUST note : Les FX sont identiques MK1/MK2.
+               Seuls RAM + I/O changent.
+
+
+======================================================================
+8.  ELEKTRON ANALOG RYTM  (MK1 / MK2)
+======================================================================
+
+Drum machine hybrid analog/digital.
+Analog : synthesis (dual VCO + noise + filter + overdrive)
+Digital : sample playback (MK2 only)
+
+--- SIGNAL FLOW (par voix) ---
+
+  Analog Engine (Dual VCO + Noise) ← Sample Engine (MK2)
+    → Analog Multimode Filter (LP/HP/BP/BR)
+    → Analog Overdrive
+    → Amp (VCA) → Pan
+    → Master Compressor
+    → Master Delay (send)
+    → Master Reverb (send)
+
+--- ANALOG ENGINE (par voix) ---
+
+  Dual VCO analogique :
+    • Pitch (coarse + fine)
+    • Shape (waveform morphing : sin → tri → saw → pulse)
+    • PWM (pulse width modulation)
+    • FM amount (modulation de fréquence)
+    • VCO1 tune / VCO2 tune
+    • VCO2 detune
+
+  Noise analogique :
+    • Level (0-127)
+    • Color (blanc → coloré)
+
+  FAUST :
+    • Dual VCO = os.osc(shape1, freq) + os.osc(shape2, freq * detune)
+    • Shape morphing = wi.crossfade entre waveforms
+    • PWM = pulse width variable
+    • FM = os.osc(modFreq) → modulate fréquence carrier
+    • Noise = no.noise + fi.lowpass/fi.highpass pour color
+
+--- SAMPLE ENGINE (MK2 uniquement) ---
+
+  Playback samples utilisateur.
+  64 MB RAM dédiée.
+  Pitch, start point, loop.
+
+  FAUST : rdtable pour playback sample.
+
+--- ANALOG FILTER (par voix) ---
+
+  Vrai filtre analogique à transistors.
+  Multimode contrôlé par CV.
+
+  Param  | Description
+  -------|------------
+  FREQ   | Cutoff (C0-C7)
+  RESO   | Résonance (auto-oscillation à haut niveau)
+  TYPE   | LP / HP / BP / BR (MK2 ajoute Band Reject)
+  ENV    | Envelope modulation (bipolaire)
+  KEYTRK | Keyboard tracking (0-100%)
+
+  FAUST : fi.svf ou filtre biquad résonant.
+          Pour le caractère analogique : ajouter drive subtil
+          avant le filtre (ef.cubicnl(0.3, 0)).
+
+--- ANALOG OVERDRIVE (par voix) ---
+
+  Overdrive analogique. Drive 0-127.
+  Saturation douce à agressive selon niveau.
+
+  FAUST : ef.cubicnl(drive, offset)
+          drive = (driveParam / 127) * maxDrive
+
+--- MASTER COMPRESSOR (global, hardware) ---
+
+  Compresseur master analogique (circuit THAT).
+  Appliqué au mix complet.
+
+  Param  : Threshold / Ratio / Attack / Release / Gain
+  FAUST  : Compresseur feedforward, voir formulaire soft-knee.
+
+--- MASTER DELAY / REVERB (send globaux) ---
+
+  Delay :
+    Time (sync BPM) / Feedback / Ping-Pong / Mix
+
+  Reverb :
+    Size / Decay / HP Damp / LP Damp / Mix
+
+  FAUST :
+    Delay  = de.delay + LP/HP filter in feedback
+    Reverb = FDN avec damping
+
+--- LFO (1 par voix) ---
+
+  1 LFO assignable par voix.
+  Waveforms : Sin / Tri / Saw / Sqr / S&H / Noise / Ramp
+  SPD / MULT / DEST / WAVE / MODE (FREE/TRIG/HOLD) / DEPTH
+
+--- ENVELOPES (ADSR par voix) ---
+
+  ADSR pour Amplitude + ADSR pour Filter.
+  Mode AHD ou ADSR selon la voix.
+
+--- PERFORMANCE MACROS ---
+
+  Retrig    : Retrigger machine (rate = note division)
+  Stutter   : Repeat stutter
+  Scatter   : Buffer scramble (glitch/beat-repeat)
+
+  FAUST :
+    Retrig  = gate pulse à la fréquence retrig
+    Stutter = buffer capture + lecture bouclée courte
+    Scatter = lecture aléatoire dans buffer
+
+--- DIFFÉRENCES MK1 vs MK2 ---
+
+  Feature        | MK1       | MK2
+  ---------------|-----------|----------
+  Sample engine  | NON       | OUI (64 MB)
+  Filter types   | LP/HP/BP  | LP/HP/BP/BR
+  Pads           | 12        | 12 (velocity sensitive)
+  Overbridge     | NON       | OUI
+  RAM            | 64 MB     | 128 MB total
+  Plus de presets| —         | OUI
+  Kit size       | 12 voix   | 12 voix + sample layer
+
+  FAUST note : MK2 = ajout sample layer + BR filter.
+               Architecture FX identique.
+               Simulation du sampleur = rdtable + pitch shift.
+
+--- ANALOGUE CV/GATE OUTPUTS ---
+
+  • 4 CV outputs (analog control voltage)
+  • 4 Gate outputs (trigger/Gate)
+  • MIDI Out
+
+
+======================================================================
+9.  ELEKTRON ANALOG FOUR  (MK1 / MK2)
+======================================================================
+
+Synthé analogique 4 voix.
+2 VCO + sub oscillator + noise → analog filter → analog overdrive.
+
+--- SIGNAL FLOW (par voix) ---
+
+  VCO1 + VCO2 (+ Sub + Noise)
+    → Analog Multimode Filter
+    → Analog Overdrive
+    → Amplifier (VCA)
+    → Pan
+    → Delay (send stéréo)
+    → Reverb (send stéréo)
+    → Main Mix
+
+--- ANALOG VOICE (par voix) ---
+
+  VCO1 : Coarse / Fine / Shape (sin/tri/saw/pulse/sqr) / PWM / FM
+  VCO2 : Coarse / Fine / Shape / PWM / FM / Detune
+  SUB  : Level, waveform (square/sub/saw)
+  NOISE: Level, color
+
+  • Oscillator sync (hard sync possible)
+  • Modulations FM : VCO1→VCO2, VCO2→VCO1, EXT→VCO1/2
+  • Pulse Width Modulation (via LFO, envelope, ou manuelle)
+
+  FAUST :
+    VCO = os.osc[freq, shape] avec param shape.
+    Sub = os.osc[freq/2] ou os.osc[freq] wave carrée.
+    FM cross-mod = le signal d'un VCO module la fréquence de l'autre.
+
+--- ANALOG MULTIMODE FILTER ---
+
+  Param  | Description
+  -------|------------
+  FREQ   | Cutoff
+  RESO   | Résonance (auto-oscillation)
+  TYPE   | LP4 / LP2 / BP / HP / Notch / OFF
+  ENV    | Envelope amount (bipolaire)
+  KEYTRK | Keyboard tracking (%)
+
+  FAUST : fi.svf(freq, Q, mode)
+          Auto-oscillation = RESO proche de 1.0.
+
+--- ANALOG OVERDRIVE ---
+
+  Overdrive analogique post-filtre.
+  Drive 0-127.
+
+  FAUST : ef.cubicnl(drive, offset).
+          La saturation adoucit la résonance du filtre.
+
+--- DELAY (send stéréo) ---
+
+  Param  | Description
+  -------|------------
+  TIME   | Temps (sync BPM)
+  FDBK   | Feedback
+  HPF    | High-pass in feedback loop
+  LPF    | Low-pass in feedback loop
+  PAN    | Panorama
+  VOL    | Wet level
+
+  FAUST : de.delay + filtres dans feedback.
+          Ping-pong en mode stéréo.
+
+--- REVERB (send stéréo) ---
+
+  Param  | Description
+  -------|------------
+  DEC    | Decay
+  HPF    | High-pass input
+  LPF    | Low-pass input
+  VOL    | Wet level
+
+  FAUST : re.stereo_fdn_demo avec filtre damping.
+
+--- LFO (2 par voix) ---
+
+  2 LFO assignables par voix.
+  Modes : FREE / TRIG / HOLD / ONE.
+
+  FAUST : Mêmes wave/param que Syntakt LFOs.
+
+--- ENVELOPES ---
+
+  ADSR Filter + ADSR Amp (par voix, indépendants).
+  Mode AHD, ADSR, AHD inversé.
+
+--- PARAM LOCKS ---
+
+  Tous paramètres lockables par step.
+
+--- DIFFÉRENCES MK1 vs MK2 ---
+
+  Feature           | MK1         | MK2
+  ------------------|-------------|----------
+  Polyphonie        | 4 voix      | 4 voix (identique)
+  Plus de presets   | —           | OUI (x2)
+  Overbridge        | NON         | OUI
+  MIDI              | In/Out/Thru | In/Out/Thru + USB
+  CV/Gate           | 2CV+2Gate   | 4CV+4Gate
+  Plus de slots FX  | —           | OUI (delay/reverb améliorés)
+  P-Locks           | Oui         | Oui (améliorés)
+
+  FAUST note : L'architecture sonore est la même MK1/MK2.
+               Overbridge + I/O sont les vrais upgrades.
+               4 voix = 4 instances polyphoniques en FAUST.
+
+--- CV / GATE OUTS (MK2: 4CV 4Gate) ---
+
+  Pour contrôle modulaire.
+
+
+======================================================================
+10.  TEENAGE ENGINEERING OP-1
+======================================================================
+
+Synthé portable tout-en-un. 4 pistes bande, synthés digitaux,
+effets, séquenceurs. Architecture unique.
+
+--- ARCHITECTURE GÉNÉRALE ---
+
+  7 modes (bouton bleu) :
+    Synth / Drum / Sequencer / Tape / Mix / FX / Setup
+
+  4-pistes bande magnétique (TAPE)
+  Pas de mémoire de patch — tout est enregistré sur la bande.
+
+--- SYNTH ENGINES (8) ---
+
+  Engine   | Type
+  ---------|----------------------------------------------
+  FM       | 2-op FM (ratio, feedback, algo)
+  Digital  | Vagues numériques (sync sweep)
+  String   | Modèle physique de corde (Karplus-Strong)
+  Pulse    | Pulse/VA (width,sub, PWM)
+  Cluster  | Détune massif (7 sons superposés)
+  Dr Wave  | Wavetable single-cycle
+  Nitro    | Distortion-based (feedback waveshaping)
+  DS-1     | Kick, Snare, Hat, Tom (drum synth)
+
+  Chaque synth engine a des paramètres spécifiques
+  contrôlés par les 4 encodeurs de couleur (Blue/Green/Screen/Gear).
+
+  FAUST :
+    FM        : 2-op FM manuel (mod → carrier)
+    Digital   : os.osc avec morphing de waveform
+    String    : Karplus-Strong (delay + filtre + feedback)
+    Pulse     : pulse wave avec PWM
+    Cluster   : 7 oscillateurs parallèles, detune fin
+    Dr Wave   : rdtable petite table waveform
+    Nitro     : waveshaper non-linéaire (foldback + drive)
+    DS-1 drum : enveloppe percussive + noise + tonal
+
+--- FX (10 modules) ---
+
+  FX       | Description
+  ---------|--------------------------------------------------
+  Delay    | Ping-pong, feedback, time (sync)
+  Reverb   | Spring reverb simulé, size, color
+  Nitro    | Distortion multiband
+  Grid      | Bitcrusher + sample rate reduction + ring mod
+  Filter   | LP / BP / HP / Notch, cutoff, resonance, LFO
+  Compressor| RMS compressor
+  Phone    | Émulation téléphone (bande passante étroite)
+  CWO      | Chorus + vibrato modulé
+  Spring   | Reverb à ressort (physique simulé)
+  master   | Compresseur/master limiter (Tape mode)
+
+  Chaque FX a 4 paramètres (encodeurs couleur).
+
+  FAUST :
+    Delay    : de.delay
+    Reverb   : reverbplate ou fm.spring_reverb
+    Nitro    : waveshaper agressif + filtres
+    Grid     : int(x*2^bits)/2^bits + downsample + ring mod
+    Filter   : fi.svf
+    Comp     : RMS envelope follower + GR
+    Phone    : fi.bandpass(300-3400 Hz) + saturation
+    CWO      : chorus + vibrado (delay+LFO modulé)
+    Spring   : réseau allpass + feedback
+
+--- LFO ---
+
+  1 LFO global (mais assignable à plusieurs paramètres).
+  Waveforms : Sin / Tri / Sqr / Saw / Random / Ramp.
+
+  FAUST : os.osc multi-wave.
+
+--- TAPE (4 pistes) ---
+
+  Enregistrement sur les 4 pistes.
+  Time-stretch possible (Tape → Speed).
+  Mixage : faders de volume par piste, pan.
+  Master compressor sur la sortie.
+
+  FAUST : Simulation de bande (saturation légère,
+          wow/flutter, filtre LP).
+
+--- SÉQUENCEURS ---
+
+  Arpeggiator, Pattern Sequencer (16 steps), Drum Sequencer,
+  Parameter Sequencer (locks).
+
+--- DÉTAIL DES ENCODEURS ---
+
+  4 encodeurs rotatifs : Blue, Green, Screen, Gear
+  + 3 encodeurs supplémentaires : Orange (Volume), White (Param), Red (Tempo)
+  + Endless encoder (navigation).
+
+  Le mapping des 4 encodeurs couleur change selon le module actif.
+
+--- FAUST NOTE OP-1 ---
+
+  • Architecture "tout dans la bande" : pas de recall de patch
+    → en FAUST, simuler le flux Tape (4 instances stéréo).
+  • Les effets sont simples (pas de processing complexe).
+  • Le CWO (Chorus + Vibrato) est le plus utile à implémenter.
+  • Le Nitro est un waveshaper intéressant (feedback + multiband).
+  • Le Phone filter est unique (émulation téléphone).
+
+
+======================================================================
+11.  TEENAGE ENGINEERING OP-Z
+======================================================================
+
+Séquenceur/synthé portable. 16 pistes.
+Architecture orientée performance.
+
+--- ARCHITECTURE GÉNÉRALE ---
+
+  16 pistes (8 synth + 8 autres types).
+  Pistes : Synth, Drum, Sampler, MIDI, Track, Master, Tape, Motion.
+
+  Chaque piste a :
+    • Son engine (synth ou sample)
+    • Filtre
+    • Effet (1 slot)
+    • Volume/Pan
+    • Step Components (modifications par step)
+
+--- SYNTH ENGINES (7) ---
+
+  Engine   | Type
+  ---------|--------------------------------
+  PULSE    | Pulse / square wave, PWM
+  WAVE     | Wavetable (5 waves : sin/saw/tri/pulse/noise)
+  FM       | 2-op FM
+  KICK     | Kick drum (pitch envelope + body)
+  SNARE    | Snare (tone + noise)
+  HAT      | Hi-hat (noise band)
+  CLAP     | Clap (noise burst)
+  BASS     | Bass synth (sub + FM)
+  LEAD     | Lead synth (wave morphing)
+  CHORD    | Chord engine (3 notes)
+  SAMPLE   | Playback samples utilisateur (via app)
+
+  FAUST :
+    Pulse   : os.osc squelettique avec PWM
+    Wavetable : rdtable avec interpolation
+    FM      : 2-op FM
+    Kick    : sin(pitchEnv) * ampEnv + click
+    Snare   : sin(pitchEnv) + noise * ampEnv
+    Hat     : no.noise → fi.bandpass → ampEnv rapide
+
+--- FILTRE (par piste) ---
+
+  Filtre simple avec cutoff + résonance.
+  LP/HP/BP.
+
+--- STEP COMPONENTS ---
+
+  Modifications par step (comme P-Locks).
+  8 types de composants :
+    TRIG   | Trigger condition (probability, retrig)
+    VEL    | Velocity
+    TIE    | Tie (legato)
+    SLIDE  | Portamento
+    ACCENT | Accent (volume boost)
+    SWING  | Swing timing
+    LEN    | Note length
+    FINE   | Micro-timing
+
+  FAUST : Table de paramètres par step (16×8 steps × NParams).
+
+--- TRACK FX (1 slot par piste) ---
+
+  Type      | Description
+  ----------|---------------------------------------------------
+  DISTORTION| Distortion (drive, tone)
+  DELAY     | Delay (time, feedback, mix)
+  REVERB    | Reverb (size, decay, mix)
+  CHORUS    | Chorus (depth, speed, mix)
+  FILTER    | Filter multimode (freq, reso, type, mix)
+  EQ        | EQ paramétrique (low, mid, high, gain)
+
+  Chaque effet a 4 paramètres.
+
+  FAUST :
+    Distortion : ef.cubicnl ou waveshaper custom
+    Delay      : de.delay
+    Reverb     : FDN
+    Chorus     : delay+LFO, L/R déphasé
+    Filter     : fi.svf
+    EQ         : fi.peq + fi.lowshelf + fi.highshelf
+
+--- MASTER FX ---
+
+  Master effects globaux (compress + limiter).
+
+--- MOTION ---
+
+  Motion recording : enregistrement de mouvements de paramètres
+  en temps réel (automation).
+
+--- PERFORMANCE MODES ---
+
+  Punch-in effects (16 effets momentanés).
+  Tape stop, stutter, reverse.
+  Mute groups.
+
+  FAUST :
+    Tape stop = ramp rapide de speed→0
+    Stutter  = buffer capture + playback loop
+    Reverse  = lecture inversée du buffer
+
+--- FAUST NOTE OP-Z ---
+
+  • Architecture 16 pistes parallèles.
+  • Chaque piste = synth engine + filter + FX slot.
+  • Les step components = automation par step.
+  • Les punch-in effects sont l'interaction la plus unique.
+  • Synth engines relativement simples (pas de FM complexe).
+
+
+======================================================================
+12.  FAUST OPERATORS ESSENTIALS
+======================================================================
+
+  Besoin                 | Opérateur FAUST
+  -----------------------|----------------------------------------------
+  Filtre LPF             | fi.lowpass(N, freq)
+  Filtre HPF             | fi.highpass(N, freq)
+  Filtre BPF             | fi.bandpass(N, freq, Q)
+  Filtre SVF (multi)     | fi.svf(freq, q, mode)
+  Filtre résonant        | fi.resonlp(freq, Q) / fi.resonhp(freq, Q)
+  Filtre peigne          | fi.comb(freq, feedback)
+  Filtre notch           | fi.notch(freq, Q)
+  Filtre shelving        | fi.lowshelf(freq, gain) / fi.highshelf(freq, gain)
+  Filtre allpass         | fi.allpass(delay, gain)
+  Crossover              | dm.analyzer_rev(bands, fLow, fHigh)
+  Distortion cubic       | ef.cubicnl(drive, offset)
+  Waveshaping            | maths.tanh(signal * drive)
+  Rectification          | abs(signal)
+  Delay                  | de.delay(input, maxTime, time)
+  Delay fractionnaire    | fdelay(N, input, time)
+  Reverb (FDN)           | re.stereo_fdn_demo
+  Reverb (plate)         | reverbplate
+  Flanger                | de.flanger(input, delay, speed, depth)
+  Chorus                 | de.chorus(input, delay, speed, depth)
+  LFO                    | os.osc(waveform, freq) / lf_lfo(waveform, freq)
+  Enveloppe ADSR         | en.adsr(atk, dec, sus, rel, gate)
+  Enveloppe follower     | dm.rms_follower_ar(atk, rel)
+  Sample reader          | rdtable(table, index)
+  Sample writer          | rwtable(table, index, value)
+  Noise (white)          | no.noise
+  Noise (pink)           | no.pink_noise
+  Dry/Wet mix            | ef.drywet(dry, wet, mix)
+  BPM sync               | ba.time(BPM)
+  Smooth control         | si.smoo
+  dB to linear           | ba.db2linear(dB)
+  Linear to dB           | ba.linear2db(linear)
+  Crossfade              | wi.crossfade(source1, source2, xfade)
+  Convolution            | an.amp_conv(table, signal)
+  Select                 | select2(selector, a, b)
+  FM synthesis           | os.osc(freq * ratio) → os.osc(freq) (manuel)
+
+
+======================================================================
+13.  FAUST PATTERNS & PITFALLS
+======================================================================
+
+--- SOFT-KNEE COMPRESSION (no ternary) ---
+
+  TLin = ba.db2linear(threshold)
+  KdB  = knee * 20
+  over = env - TLin + KdB/2
+  posOver = max(over, 0.0)
+  GRdB   = (posOver * posOver) / (2.0 * KdB * (ratio - 1.0))
+  gainRed = ba.db2linear(-GRdB)
+  compressed = band * gainRed
+
+--- LOOK-AHEAD COMPRESSION ---
+
+  delayed = signal @ int(ma.SR * lookAheadMs / 1000)
+  env = dm.rms_follower_ar(atk, rel) : delayed
+  → le compresseur réagit avant la transient
+
+--- FEEDBACK LOOP (mb~fb style) ---
+
+  fbAmt = ffb * 2          // maps 0-1 → 0-2
+  delaySamps = int(ma.SR * ddelMs / 1000)
+  feedback = madeUp * fbAmt @ delaySamps
+  output = madeUp + feedback
+
+--- FREEZE BUFFER ---
+
+  bufferSize = int(ma.SR * bufferSec)
+  buffer = rwtable(size, idx)
+  // Si freeze ON : lecture bouclée
+  // Si freeze OFF : écriture normale + passthrough
+  readIdx = select2(freeze, writeIdx, loopIdx)
+  output = rdtable(buffer, readIdx)
+
+--- DUAL-BAND PROCESSING ---
+
+  // Split avec crossover LR4
+  // low = dm.analyzer_rev(2, fLow, fHigh) band 0
+  // high = dm.analyzer_rev(2, fLow, fHigh) band 1
+  // Traitement indépendant low/high
+  // Mix = lowProcessed + highProcessed
+
+--- VECTOR SYNTHESIS CROSSFADE ---
+
+  // Joystick (X, Y) → 4 poids W1, W2, W3, W4
+  // W1 = (1-X)*(1-Y)  — top-left
+  // W2 = X*(1-Y)      — top-right
+  // W3 = (1-X)*Y      — bottom-left
+  // W4 = X*Y          — bottom-right
+  // output = src1*W1 + src2*W2 + src3*W3 + src4*W4
+
+--- PING-PONG DELAY ---
+
+  leftOut  = de.delay(leftIn  + rightIn * -feedback, maxTime, time)
+  rightOut = de.delay(rightIn + leftIn  * -feedback, maxTime, time)
+
+--- PITFALLS ---
+
+  ❌ Utiliser ? (ternaire) → erreur de parsing FAUST
+     ✅ Remplacer par max/min ou select2(selector, a, b)
+
+  ❌ Oublier le cast int() sur les delays
+     ✅ delaySamps = int(ma.SR * delayMs / 1000)
+
+  ❌ Pas de smoothing sur les hslider → zipper noise
+     ✅ hslider(...) : si.smoo
+
+  ❌ Oublier les conversions dB ↔ linear
+     ✅ ba.db2linear(dB) / ba.linear2db(linear)
+
+  ❌ Fractional delay @ sans cast
+     ✅ @ int(...)
+
+  ❌ import sans lib disponible
+     ✅ Vérifier avec faust -lb list
+
+
+======================================================================
+14.  WHAT FAUST CAN DO THAT THESE MACHINES CAN'T
+======================================================================
+
+  1. Modulation matrix libre — n'importe quelle source → n'importe
+     quelle destination (Torso S-4 en a 4/piste, mais en FAUST c'est
+     illimité).
+
+  2. Granular + Filter Bank + Freeze dans une seule chaîne.
+
+  3. Dual-band processing avec contrôle indépendant par bande
+     (S-4 a du dual-band dans Color, mais en FAUST on fait N-bandes).
+
+  4. Envelope followers comme modulateur partout
+     (S-4 les a, pas les Elektron).
+
+  5. Morphing continu entre types de filtres.
+
+  6. Macro system — un seul contrôle affecte N paramètres.
+
+  7. Scene snapshots avec save/recall.
+
+  8. FFT spectral processing avancé (Frequency Warper, vocoder, etc).
+
+  9. Convolution créative (RCM-like mais flexible).
+
+  10. Synthèse vectorielle + FM + sample crossfade combinés
+      (comme SY22/35 mais avec plus de sources).
+
+
+======================================================================
+15.  ELEKTRON MACHINEDRUM  (SPS-1 / UW / UW+ MKII)
+======================================================================
+
+Drum machine numérique avec synthèse + sampling (UW).
+16 pistes, 12 machines + 4 tracks de contrôle.
+
+--- SIGNAL FLOW (par track) ---
+
+  Machine (Engine)
+    → Filter (multimode LP/HP/BP + notch)
+    → EQ (Low/High shelving + Peak)
+    → Amp (Volume + Pan)
+    → Cue Bus (A/B)
+    → Delay (send global)
+    → Reverb (send global)
+    → Master Compressor
+    → Master Out
+
+--- ENGINES (20+) ---
+
+  Engine    | Description
+  ----------|-----------------------------------------------
+  TRX 808   | Émulation 808 (BD, SD, CP, CH, OH, CB, MA, RS)
+  TRX 909   | Émulation 909 (BD, SD, CH, OH, CP, RS, MA, CB)
+  E-DRUM    | Modèles physiques de percussions
+  EFM       | Synthèse FM percutante (2-op FM + noise)
+  E12       | Sampler 12-bit (lo-fi, non-UW sample ROM disponible)
+  GnR       | Granulaire (grains à partir d'un sample buffer)
+  SIDSID    | Émulation C64 SID (3 oscillateurs, filtre SID)
+  NOISE     | Générateur de bruit (blanc, coloré, percussif)
+  GND       | Synthèse ground (waveformes type sine à noise)
+  CONE      | Filtre résonant auto-modulant
+  RAMOP     | Synthèse à tables d'onde (samples RAM sur UW)
+  ROMOP     | Synthèse à tables d'onde (ROM)
+  +
+  Algorithmic drums, Synth drums, Bass, etc.
+
+  FAUST :
+    TRX     : Enveloppe percussive + tonal + noise mixé
+    EFM     : os.osc * enveloppe + noise, ratio FM simple
+    E12     : rdtable sample + réduction 12-bit (int(x*2^12)/2^12)
+    GnR     : rwtable buffer → lecture grain avec fenêtrage
+    SID     : 3 oscillateurs carrés/saw/pulse + fi.svf SID-style
+    Noise   : no.noise → enveloppe percussive
+
+--- UW (User Wave) ---
+
+  UW      : 16 slots samples, 512 KB RAM
+  UW+ MKII: 96 slots samples, 128 MB RAM + CompactFlash
+  Sampling direct via entrée audio.
+  Wavetable playback possible (RAMOP machine).
+
+  FAUST : rdtable avec interpolation.
+          Sampling = rwtable avec trigger enregistrement.
+
+--- FILTRE MULTIMODE (par track) ---
+
+  Param  | Description
+  -------|------------
+  FREQ   | Cutoff
+  RESO   | Résonance
+  TYPE   | LP / HP / BP / Notch
+  ENV    | Envelope modulation
+
+  FAUST : fi.svf(freq, Q, mode).
+
+--- EQ PAR TRACK ---
+
+  LOW  | Shelving basse
+  MID  | Peak (fréquence variable)
+  HIGH | Shelving haute
+  GAIN | Gain pour chaque bande
+
+  FAUST : fi.lowshelf(fLow, gain) + fi.peq(fMid, Q, gain) +
+          fi.highshelf(fHigh, gain)
+
+--- DELAY (send global) ---
+
+  TIME   | Temps (sync BPM, 1/16 à 1/1)
+  FDBK   | Feedback
+  HPF    | High-pass dans feedback
+  LPF    | Low-pass dans feedback
+  VOL    | Wet level
+  X      | Ping-pong ON/OFF
+
+  FAUST : de.delay + filtre HPF/LPF dans feedback.
+
+--- REVERB (send global) ---
+
+  DECAY  | Decay time
+  HOLD   | Taille room / hall
+  COLOR  | Dark ↔ Bright (damping)
+  VOL    | Wet level
+
+  FAUST : re.stereo_fdn_demo avec filtre damping.
+          COLOR = fréquence shelving damping.
+
+--- MASTER COMPRESSOR (global, analogique THAT) ---
+
+  THR | Threshold
+  RAT | Ratio
+  ATK | Attack
+  REL | Release
+  G   | Make-up gain
+
+  FAUST : Compresseur feedforward soft-knee.
+
+--- LFO (1 par track) ---
+
+  1 LFO assignable, 5 waveforms (Sin/Tri/Saw/Sqr/S&H).
+  SPD / DEST / DEPTH / MODE (FREE/TRIG/HOLD/ONE/HALF).
+
+--- PARAM LOCKS ---
+
+  Tous paramètres lockables par step.
+  Trigs conditionnels (fill, probability, retrig).
+
+--- DIFFÉRENCES VERSIONS ---
+
+  Modèle   | Sampling | RAM    | Storage   | Overbridge
+  ---------|----------|--------|-----------|-----------
+  SPS-1    | NON      | 0      | Internal  | NON
+  SPS-1 UW | OUI      | 512 KB | Internal  | NON
+  MKII     | OUI      | 128 MB | CF card   | OUI (MKII)
+  UW+      | OUI      | 128 MB | CF card   | OUI
+
+  FAUST note : Architecture FX identique sur toutes les versions.
+               UW ajoute le sample engine + wavetable.
+               MKII ajoute 4 sorties stéréo + Overbridge.
+
+
+======================================================================
+16.  ELEKTRON MONOMACHINE  (SFX-6 / SFX-60 MKII)
+======================================================================
+
+6 voix synthèse numérique multi-engine.
+Polyphonie variable selon l'engine (jusqu'à 6 voix).
+
+--- SIGNAL FLOW (par voix) ---
+
+  Machine Engine (SID / FM+ / WOOF / VAP / SWP / DIGIPro)
+    → Amp (Volume + Pan)
+    → Delay (send global, stéréo, 3 types)
+    → Reverb (send global, 4 types)
+    → Master EQ (3-band)
+    → Master Out
+
+  PAS DE FILTRE MULTIMODE GÉNÉRIQUE — chaque engine a
+  son propre filtre / circuit intégré.
+
+--- ENGINES (6) ---
+
+  Engine   | Description
+  ---------|-----------------------------------------------
+  SID      | Émulation C64 SID 6581/8580
+           | 3 oscillateurs carrés/saw/pulse/tri/noise
+           | Filtre SID (LP/BP/HP 12dB, résonance)
+           | PWM, ring mod, sync, 3 enveloppes AD
+           | → Le plus détaillé des 6 engines
+
+  FM+      | Synthèse FM modulaire (jusqu'à 6 opérateurs)
+           | Algortihmes libres (routage manuel)
+           | Ratios, feedback, loop d'enveloppe
+           | → Plus flexible que du 2-op, moins que DX7
+
+  WOOF     | Synthèse basse modelée
+           | Waveform saturée + filtre enveloppe
+           | Drive intégré, pitch/amplitude env rapide
+
+  VAP      | Virtual Analog Polysynth
+           | Oscillateur VA (saw/pulse avec PWM)
+           | Filtre 24dB ladder + 12dB SVF
+           | Drive, chorus intégré, détune
+           | → Le plus "classique" des 6
+
+  SWP      | Sweep — onde unique qui sweep
+           | Waveform glissante continue (sin → tri → saw → sqr → noise)
+           | Filtre résonant + enveloppe
+
+  DIGIPro  | Digital Waveshaper
+           | Table d'onde + waveshaper non-linéaire
+           | Saturation, bitcrush, distorsion intégrée
+           | Cross-modulation possible
+
+  FAUST :
+    SID     : 3 os.osc polyphoniques + en.adsr (simulation AD)
+              fi.svf SID-style (12dB, résonance)
+    FM+     : FM modulaire (k opérateurs en série/parallèle)
+    WOOF    : os.osc[saturé] + enveloppe rapide
+    VAP     : os.osc VA + fi.ladder(freq, Q, drive)
+    SWP     : wi.crossfade[sin→tri→saw→sqr→noise] + filtrage
+    DIGIPro : rdtable[wavetable] + waveshaper + ef.cubicnl
+
+--- DELAY (send global, 3 types) ---
+
+  Type     | Description
+  ---------|-----------------------------------------------
+  DIGITAL  | Delay numérique propre (sync, feedback, HPF/LPF)
+  BBD      | Bucket Brigade Delay (émulation analogique, sombre)
+  TAPE     | Tape delay (wow/flutter, saturation dans feedback)
+
+  TIME / FDBK / COLOR / VOL / X (ping-pong)
+
+  FAUST :
+    DIGITAL : de.delay
+    BBD     : de.delay + fi.lowpass dans feedback + noise
+    TAPE    : de.delay + wow/flutter (LFO lente) + saturation
+
+--- REVERB (send global, 4 types) ---
+
+  Type     | Description
+  ---------|-----------------------------------------------
+  HALL     | Grande salle, decay long
+  PLATE    | Plate classique, bright
+  ROOM     | Pièce, decay court
+  SPRING   | Ressort, métallique, court
+
+  DECAY / COLOR / TONE / VOL
+
+  FAUST :
+    HALL   : re.stereo_fdn_demo (delay long)
+    PLATE  : reverbplate
+    ROOM   : FDN court + damping élevé
+    SPRING : réseau allpass + feedback (fe.back + fe.comb)
+
+--- MASTER EQ ---
+
+  3-band : Low shelf / Peak Mid / High shelf.
+
+--- LFO (1 par voix) ---
+
+  1 LFO assignable.
+  Waveforms : Sin / Tri / Saw / Sqr / S&H / Random.
+  SPD / DEST / DEPTH / MODE.
+
+--- SÉQUENCEUR ---
+
+  16 steps × 4 pages = 64 steps max.
+  P-Locks sur tous paramètres.
+  Arpégiateur par voix (Up, Down, Up/Down, Random).
+
+--- DIFFÉRENCES SFX-6 vs SFX-60 (MKII) ---
+
+  Feature        | SFX-6     | SFX-60 (MKII)
+  ---------------|-----------|---------------
+  Voix           | 6         | 6 (identique)
+  Sorties        | 2 mono    | 4 stéréo
+  Overbridge     | NON       | OUI
+  Plus d'engines | —         | VAP + SWP + DIGIPro améliorés
+  Plus de FX     | —         | + SPRING reverb, + TAPE delay
+  Mémoire presets| 64        | 128+
+
+  FAUST note : Les engines SID, FM+, WOOF sont les mêmes.
+               Les FX supplémentaires (TAPE delay, SPRING reverb)
+               sont les vrais ajouts MKII.
+
+
+======================================================================
+17.  TORSO ELECTRONICS  (T-1 Eurorack / TS-1 Desktop)
+======================================================================
+
+Séquenceurs algorithmiques génératifs.
+Architecture différence fondamentale du S-4 (pas de sampleur).
+
+--- TORSO T-1 (Eurorack) ---
+
+  • 8 pistes CV/Gate + MIDI
+  • 8 CV outputs ±10V, 8 Gate 5V
+  • MIDI In/Out/Thru + USB-C
+  • Algo­rithmes génératifs dédiés (Markov, Euclidean, Random Walk…)
+
+--- TORSO TS-1 (Desktop) ---
+
+  • Desktop / tabletop (pas Eurorack)
+  • 8 pistes MIDI
+  • 1 CV/Gate output (optionnel)
+  • MIDI In/Out + USB
+  • Même cœur algorithmique que le T-1
+  • Effets master uniquement (pas de slots par track)
+
+--- ALGORITHMES DE SÉQUENCEMENT ---
+
+  Algorithme    | Description
+  --------------|--------------------------------------------------
+  EUCLIDEAN     | Distribution de N hits sur K pulses
+                | Rotation, pulse length, offset
+  MARKOV        | Chaîne de Markov (ordre 1-4)
+                | États définis par l'utilisateur ou aléatoires
+                | Matrice de transition ajustable
+  RANDOM WALK   | Marche aléatoire contrainte
+                | Pas min/max, bounce/reverse aux limites
+  TURING MACHINE| Registre à décalage (style Rene/Music Thing)
+                | Longueur du registre, bits, pulses
+  DRUNKARD      | Random Walk avec dérive (drift)
+                | Simule une promenade avec tendance directionnelle
+  CHAOS         | Systèmes chaotiques (Lorenz, logistic map, Rossler)
+                | Mappe un état chaotique → note/CV
+  BURST         | Burst generator (rafales de triggers)
+                | Count, spacing, probability
+  LOGIC         | Portes logiques entre tracks
+                | AND/OR/XOR/NOT appliqués aux triggers
+  SEQUENCE      | Step sequencer classique (16 steps)
+                | Slides, ties, accents, velocity
+  PROBABILITY   | Trigger probability par step
+                | Accent probability, random skip
+
+  FAUST :
+    Euclide    : Algorithme de Bjorklund (table de booléens)
+    Markov     : Table de transition N×N, random select
+    Random Walk: rand + clamp (min, max)
+    Turing     : Registre à décalage + random feedback
+    Chaos      : Équations différentielles (Lorenz : dx/dt = σ(y-x)...)
+    Burst      : Counter + gate generator
+
+--- FX ARCHITECTURE (T-1) ---
+
+  8 slots d'effets internes assignables par track ou master.
+
+  Type       | Description
+  -----------|--------------------------------------------------
+  REVERB     | Hall / Plate / Room / Shimmer
+  DELAY      | Ping-pong / Tape / Digital
+  BITCRUSH   | Bit reduction + sample rate reduction
+  FILTER     | LP/HP/BP, 12/24 dB/oct
+  COMPRESSOR | Compresseur simple
+  WAVEFOLDER | Wavefolding + saturation
+  LFO        | LFO additionnel pour modulation (pas audio)
+  CHORUS     | Chorus/Flanger (via firmware récent)
+  SATURATION | Saturation douce à agressive
+
+  FAUST :
+    Reverb    : re.stereo_fdn_demo
+    Delay     : de.delay
+    Bitcrush  : int(x*2^bits)/2^bits + downsample
+    Filter    : fi.svf
+    Compressor: Envelope follower + GR
+    Wavefolder: maths.tanh + fold (wavefold custom)
+    Chorus    : delay+LFO, L/R déphasé
+    Saturation: ef.cubicnl(drive, offset)
+
+--- FX ARCHITECTURE (TS-1) ---
+
+  FX master uniquement (pas de slots par track) :
+
+  • REVERB  (send master)
+  • DELAY   (send master)
+  • BITCRUSH (master)
+  • FILTER  (master)
+
+  FAUST : Mêmes implémentations que T-1, mais globales.
+
+--- MODULATION (T-1) ---
+
+  6 LFOs polyrythmiques (indépendants du tempo).
+  Random generators.
+  Envelope followers (sur entrée audio ou CV).
+  Tous paramètres modulables.
+
+  FAUST : 6 LFOs en parallèle.
+          Envelope follower = dm.rms_follower_ar(atk, rel).
+
+--- MÉMOIRE ---
+
+  T-1  : 128 patterns, 16 projects.
+  TS-1 : 64 patterns, 8 projects.
+
+--- NOTE FAUST TORSO SEQUENCERS ---
+
+  • Le cœur est algorithmique (pattern generation), pas audio.
+    En FAUST, on code les algorithmes en pur math/random.
+
+  • Les FX sont les mêmes que S-4 (voir section Torso S-4 pour
+    les implémentations détaillées).
+
+  • Les LFOs polyrythmiques (T-1 : 6 indépendants) sont un
+    point fort — FAUST permet d'en faire autant qu'on veut.
+
+  • Pour le CV generation en FAUST : sortie dans le range
+    0-1 ou -1 à 1, scaling pour 0-10V ou 0-5V.
+
+  • Les algorithmes de Markov / Turing Machine n'ont pas
+    d'équivalent direct dans les machines Elektron.
+
+
+======================================================================
+18.  ROSSUM ELECTRONICS PANHARMONIUM
+======================================================================
+
+Module Eurorack — Resynthèse additive spectrale.
+Décompose l'audio entrant en 48 oscillateurs via FFT,
+les re-synthétise avec contrôle spectral continu.
+
+--- DSP CORE ---
+
+  • FFT : 1024 samples, fenêtre Hann
+  • Hop size : 256 (75% overlap)
+  • Frequency mapping : 512 bins FFT → 48 bandes logarithmiques
+  • 48 oscillateurs numériques phase-locked par voix
+  • Polyphonie : 1 à 8 voix (voice-stealing, redistribution partiels)
+  • Sampling rate : 48 kHz
+  • Analyse rate : ~187 Hz
+
+--- PARAMÈTRES ---
+
+  Param    | Description
+  ---------|----------------------------------------------------------
+  SPECTRAL CLOUD | Seuil de gate + noise floor des 48 bandes
+           | Low = tracking partiel épars (notes claires)
+           | High = toutes les bandes resonnent (ambiance/drone)
+  SHIFT    | Transposition du banc de résonateurs
+           | f_out = f_in * 2^(shift/12), ±24 semi-tons
+  WARP     | Stretch/compress spectral
+           | Interpole entre spacing linéaire et log
+  DECAY    | Per-oscillator decay (1 ms → 10 sec)
+           | a = exp(-1.0 / (Fs * T))
+  SPREAD   | Largeur stéréo + detuning inter-bande
+           | Odd/even bins décalés L/R
+  SCULPT   | Enveloppe spectrale (LP/HP appliqué aux gains de bande)
+  COMPLEX  | Inharmonicité + jitter de fréquence par bande
+  VOICES   | Polyphonie (1-8)
+  BLEND    | Dry/wet crossfade
+  CV1-3    | Entrées CV assignables
+
+--- SIGNAL FLOW ---
+
+  Audio In
+    → FFT Analysis (1024 pt, Hann, 256 hop)
+    → Peak Detection / Energy Extraction
+    → 48 Oscillators × N Voices
+    → Shift / Warp / Sculpt / Complex / Spread modifiers
+    → Decay Envelopes (per-oscillator)
+    → Sum Voices
+    → Dry/Wet Mix
+    → Output
+
+--- FAUST HINTS ---
+
+  • C'est le module le plus FFT-heavy de toutes les machines
+    du fichier. Nécessite `fft.lib` ou implantation manuelle
+    overlap-add.
+
+  • Structure FAUST :
+    ```
+    import("fft.lib");
+    // 1024 pt FFT, Hann window
+    // phase vocoder → extraction magnitude + fréquence
+    // génération : 48 oscillateurs sinusoïdaux
+    // f_out = f_in * shiftFactor
+    // décroissance exponentielle par oscillateur
+    ```
+
+  • La partie cruciale est le peak tracking : extraire les
+    48 pics les plus forts des 512 bins FFT.
+
+  • 48 oscillateurs par voix × 8 voix = 384 oscillateurs
+    simultanés max. En FAUST, coûteux mais faisable avec
+    des oscillateurs en banc parallèle.
+
+  • Les paramètres WARP et COMPLEX sont les plus originaux :
+    - WARP = resampling non-linéaire de l'axe fréquentiel
+    - COMPLEX = jitter + inharmonicité (multiplie les ratios
+      par des valeurs non-rationnelles)
+
+  • SCULPT = enveloppe spectrale morphing. En FAUST on peut
+    aller plus loin : LFO sur SCULPT, modulation par
+    envelope follower, etc.
+
+  • Simuler le DECAY exponentiel par oscillateur :
+    ```
+    decay_a = exp(-1.0 / (ma.SR * decayTime));
+    rms = decay_a * rms + (1 - decay_a) * abs(oscOut);
+    oscOut *= rms / prevRms;
+    ```
+
+  • Pour une version simplifiée sans FFT :
+    - Remplacer FFT par banc de filtres résonants (fi.resonbp)
+    - 48 bandes fixes (comme Torso S-4)
+    - Pitch tracking approximatif avec zero-crossing
+
+
+======================================================================
+19.  KORG ELECTRIBE SERIES  (EMX-1 / ESX-1 / E2 / E2S)
+======================================================================
+
+Grooveboxes de la série Electribe. Plusieurs générations :
+
+  EMX-1  : Synthétiseur à modélisation analogique (2005)
+  ESX-1  : Sampler (2005)
+  E2     : Synth + Drum (2014)
+  E2S    : Sampler (2015)
+
+--- 19.1  EMX-1 (Analog Modeling Synthesizer) ---
+
+  Parties : 9 synth + 1 Audio In + 2 MIDI
+
+--- OSCILLATEURS (par part) ---
+
+  2 VA oscillateurs + sync/ring mod.
+  Waveforms : Saw, Pulse/PWM, Triangle, Sine, Noise.
+
+  FAUST :
+    Saw    = os.sawtooth(freq)
+    Pulse  = os.oscp(freq, width) (PWM = width modulé)
+    Tri    = os.tri(freq)
+    Sine   = os.osc(freq)
+    Noise  = no.noise
+    Sync   = hard sync (reset osc esclave)
+    Ring   = os.osc1 * os.osc2
+
+--- FILTRE (par part) ---
+
+  LP / BP / HP, 12dB ou 24dB/oct, résonance.
+  Enveloppe ADSR sur filtre.
+
+  FAUST : fi.lowpass(N=2/4, freq) / fi.highpass(2/4, freq) /
+          fi.bandpass(2/4, freq, Q)
+
+--- AMP ENVELOPE ---
+
+  ADSR (ou AD mode drum).
+
+--- LFO (1 par part) ---
+
+  7 waveforms : Tri, Saw, Square, S&H, Random, etc.
+  SPD / DEST / DEPTH.
+
+--- EFFETS (EMX-1) ---
+
+  Insert (9 types, 1 slot par part) :
+    Comp, Distortion, Decimator, Flanger, Chorus,
+    Phaser, Tremolo, Auto Pan, Ring S Mod
+
+  Master (delay/reverb) :
+    Delay (sync BPM, feedback), Reverb (hall/plate/room),
+    Tape Echo, Master Delay, Master Reverb
+
+  Tube Force (12AX7 analog tube sur master) :
+    Saturation douce donnant chaleur/compression.
+
+  FAUST :
+    Comp      : Envelope follower + GR
+    Dist      : ef.cubicnl(drive, offset)
+    Decimator : int(x*2^bits)/2^bits + downsample
+    Flanger   : comb filter + LFO
+    Chorus    : delay + LFO, L/R déphasé
+    Phaser    : allpass cascade + LFO
+    Tremolo   : signal * LFO (sin/tri)
+    Auto Pan  : signal * panner(LFO)
+    Ring S Mod: signal * os.osc(freq)
+    Tube      : ef.cubicnl(1.0-2.0, 0) + subtile high harmonics
+
+--- 19.2  ESX-1 (Sampler) ---
+
+  Parties : 8 sample + 1 accent + 1 Audio In
+  Sample  : 48 kHz/16-bit, SmartMedia/SD (128 MB)
+  Engines : Time-Slice, Slice, Pitch, Loop, Reverse, Trim
+
+  Filtre, LFO, effets : identiques EMX-1 (dont Tube Force).
+
+  FAUST : rdtable + pitch shift + time-slicing.
+
+--- 19.3  ELECTRIBE 2 (Synth / Drum — 2014) ---
+
+  Parties : 16 (synth ou drum selon OS : rouge = synth, bleu = drum).
+
+--- OSCILLATEURS (part synth) ---
+
+  VA :     Saw, Square, Triangle, Sine, Ramp, Pulse
+  Noise :  White / Pink
+  PCM :    250+ multisamples (Piano, Organ, Strings, Brass...)
+  Wavetable user : jusqu'à 8 waves importées
+
+--- DRUM PARTS (part drum) ---
+
+  Kick / Snare / Clap / Hi-Hat / Open HH / Tom / Crash / Ride
+  / Rim / Shaker / Perc — pure synth (Tone/Punch/Decay/Noise).
+
+  FAUST :
+    Kick    = sin(pitchEnv) * ampEnv
+    Snare   = sin + noise * ampEnv
+    Hi-Hat  = noise → fi.bandpass → ampEnv rapide
+    Clap    = noise burst coloré + reverb courte
+
+--- FILTRE (par part) ---
+
+  Multimode : LP12 / LP24 / HP12 / BP12 / Notch / Side Band (SG)
+  FREQ / RESO / ENV / KEYTRK
+
+  FAUST : fi.svf(freq, Q, mode).
+          SG (Side Band) = ring mod-like, passe une bande latérale.
+
+--- LFO (2 par part) ---
+
+  2 LFOs assignables.
+  Waves : Tri, Saw, Square, Random, S&H, EG (one-shot), Step.
+
+--- EFFETS INSERT (16 types, 1 slot par part) ---
+
+  Comp, Limiter, Dist, Decimate, Flanger, Chorus, Phaser,
+  Ensemble, Auto Pan, Tremolo, Ring Mod, Vow/Formant,
+  Grain Shifter, Amp Sim, Tape Echo, Send Level.
+
+  FAUST :
+    Comp        : Env follower + GR
+    Limiter     : hard/soft clipper
+    Dist        : ef.cubicnl + fold
+    Decimate    : bitcrush + SRR
+    Flanger     : comb filter LFO
+    Chorus      : delay LFO
+    Phaser      : allpass cascade LFO
+    Ensemble    : 3 chorus parallèles (style Juno)
+    Auto Pan    : panner LFO
+    Tremolo     : amp LFO
+    Ring Mod    : * os.osc
+    Vow/Formant : fi.bandpass résonant (formants voyelles)
+    Grain Shifter: granular pitch shifter
+    Amp Sim     : modélisation ampli guitare
+    Tape Echo   : delay avec saturation bande
+
+--- EFFETS MASTER ---
+
+  Reverb : Hall / Plate / Spring
+  Delay  : Ping-Pong / Tape
+
+--- SÉQUENCEUR (E2) ---
+
+  16 steps, 4 bars (64 steps).
+  Motion Sequence (automation par mouvement).
+  Step Jump, Trigger Pads.
+
+--- 19.4  ELECTRIBE 2 SAMPLER (E2S) ---
+
+  Parties : 16 (sample, slicé, kick, snare, hh, clap, tom, perc, multi).
+  Sample : 48 kHz/16-bit, SD card FAT32.
+  Engines : Time-Slice, Slice, Pitch, Loop, Reverse, Normalize.
+
+  Filtre, LFO, effets : identiques E2.
+  Recording : Line In / Mic In avec gate trigger.
+
+  FAUST : rdtable + enveloppe + time-slice (triggers sur transients).
+
+--- COMPARAISON SÉRIE ELECTRIBE ---
+
+  Feature        | EMX-1   | ESX-1   | E2      | E2S
+  ---------------|---------|---------|---------|---------
+  Parts          | 9+2MIDI | 8+1Acc  | 16      | 16
+  Synthèse       | VA      | Sample  | VA+PCM+WT| Sample
+  Tube Force     | OUI     | OUI     | NON     | NON
+  Insert FX      | 9 types | 9 types | 16 types| 16 types
+  Master FX      | D+R+TE  | D+R+TE  | D+R     | D+R
+  LFOs/part      | 1       | 1       | 2       | 2
+  Polyphonie     | 4 notes | 4 notes | 4 notes | 4 notes
+  Filter modes   | LP/HP/BP| LP/HP/BP| LP/HP/BP/N/SG| LP/HP/BP/N/SG
+
+  FAUST note :
+    • L'EMX-1/ESX-1 ont le Tube Force (12AX7) — saturation douce
+      sur le master. En FAUST : ef.cubicnl(1.0-2.0, 0) ou mieux,
+      modélisation triode (équations de Child-Langmuir).
+    • L'E2 a des oscillateurs PCM + wavetable — les plus riches
+      de la série pour le sound design en FAUST.
+    • Le Grain Shifter (E2) est un pitch shifter granulaire
+      — même principe que Chrono Pitch (Tonverk).
+    • Le Vow/Formant filter est unique dans cette gamme de prix.
+
+
+======================================================================
+20.  MAKE NOISE  (Modules DSP : Morphagene / Mimeophon / Spectraphon / Erbe-Verb)
+======================================================================
+
+Make Noise est surtout connu pour ses modules analogiques (Maths, QPAS,
+0-Coast, Strega…), mais plusieurs modules sont 100 % DSP ou hybrides
+avec traitement numérique du signal. Seuls les modules à DSP audio
+sont détaillés ici.
+
+--- 20.1  MORPHAGENE — Synthèse granulaire / Tape Microsound ---
+
+Module granulaire basé sur le concept de "reel" (bande virtuelle).
+Charge des fichiers WAV sur SD card et les lit par grains.
+
+--- SPECS DSP ---
+
+  • SR : 48 kHz, 24-bit
+  • MCU : STM32 + Codec AKM
+  • Buffer : RAM (fichier reel chargé entièrement)
+  • Pas de buffer circulaire — accès direct aux positions
+  • Grains jusqu'à ~2-3 secondes
+
+--- PARAMÈTRES ---
+
+  Param       | Description
+  ------------|----------------------------------------------------------
+  SPLICE      | Position du marqueur dans le reel (reset curseur)
+              | Détermine le point de déclenchement du grain
+  GENE.SIZE   | Durée de la fenêtre de grain (ms / frames)
+              | Largeur du grain — détermine le timbre granulaire
+  ORGANIZE    | Sélection de l'enveloppe/fenêtre du grain
+              | Hann / Bartlett / Trapézoïde / Asymétrique
+  MORPH       | Chemin de lecture dans les splices
+              | Ordre, répétition, backward, random
+  VARISPEED   | Vitesse de lecture / transposition
+              | Resampling du buffer (affecte pitch et durée)
+  SHIFT        | Pitch shifting indépendant (granulation en sortie)
+              | Indépendant du VARISPEED
+  SMOOTH      | Crossfade entre grains adjacents
+              | Interpolation du grain window overlap
+  PROB        | Probabilité de saut / déclenchement du prochain grain
+              | Randomisation temporelle
+
+--- SIGNAL FLOW ---
+
+  SD Card → Reel Buffer (RAM)
+    → Splice Select (SPLICE)
+    → Grain Reader (GENE.SIZE × ORGANIZE)
+    → Pitch Shifter (VARISPEED + SHIFT)
+    → Grain Window / Envelope
+    → Smooth Crossfade (SMOOTH)
+    → Probability Gate (PROB)
+    → Output
+
+--- FAUST HINTS ---
+
+  • C'est l'architecture granulaire de référence pour FAUST.
+    Structure de base :
+    ```
+    buffer = rwtable(size, idx);
+    grainEnv = en.hann_window(grainSize); // ou Bartlett, etc.
+    grain = rdtable(buffer, readPos) * grainEnv;
+    // Overlap-add : plusieurs grains en parallèle, sommés
+    // VARISPEED = vitesse de lecture du buffer
+    // SHIFT = pitch-shift post-grain (resampling)
+    ```
+
+  • ORGANIZE change la forme de la fenêtre de grain :
+    - Hann : -0.5 * cos(2π * t/win)
+    - Bartlett : triangle symétrique
+    - Trapézoïde : plateau + attaque/release
+    - Asymétrique : attaque rapide, release lent
+
+  • SMOOTH = crossfade entre grains qui se chevauchent.
+    Overlap de 50% minimum, interpolation linéaire.
+
+  • PROB = random gate sur le déclenchement du grain.
+    En FAUST : `select2(no.noise > prob, grain, 0.0)`.
+
+  • Pour un Morphagene-like complet :
+    - 4-8 grains simultanés en overlap
+    - Buffer de reel 48 kHz / 24-bit
+    - 4 types de fenêtres
+    - Pitch-shift indépendant (SHIFT) + speed (VARISPEED)
+
+
+--- 20.2  MIMEOPHON — Karplus-Strong / Delay + FDN ---
+
+Delay stéréo avec cœur Karplus-Strong + réverbération FDN intégrée
+(HALO). Architecture hybride analogique/numérique.
+
+--- SPECS DSP ---
+
+  • SR : 48 kHz, 24-bit
+  • DSP dédié (non documenté publiquement)
+  • Ligne à retard numérique modulée
+  • FDN à 8 lignes pour HALO
+  • Filtre SVF analogique en entrée (COLOR)
+  • Feedback analogique + numérique
+
+--- PARAMÈTRES ---
+
+  Param   | Description
+  --------|----------------------------------------------------------
+  RATE    | Temps de retard (ms / note)
+          | Modulation cyclique = pitch shifting (chorus/flanger/barberpole)
+  COLOR   | Filtre SVF analogique en entrée de ligne à retard
+          | LP / BP / HP, 12 dB/oct
+          | Contrôle le timbre du signal dans la boucle
+  HALO    | Réverbération FDN (8 lignes modulées)
+          | Injectée dans la boucle de feedback
+  ZONE    | Multiplication/division d'horloge du delay
+          | Plages de temps (note divisions)
+  SKEW    | Modulation sinusoïdale déphasée L/R
+          | Flanging stéréo / spread
+
+--- SIGNAL FLOW ---
+
+  Input
+    → Color Filter (SVF analogique — LP/BP/HP)
+    → Digital Delay Line (modulée par RATE)
+    → Halo (FDN 8 lignes)
+    → Feedback loop (analog + digital mix)
+    → Skew (stéréo phase L/R)
+    → Output
+
+--- FAUST HINTS ---
+
+  • Karplus-Strong de base :
+    ```
+    ks(freq, feedback) = _ : de.delay(maxDelay, SR/freq)
+                           : *(feedback) <: _,_;
+    // Le feedback + le filtre LP créent la résonance
+    ```
+
+  • Le RATE module la longueur de delay = pitch shifting.
+    Modulation cyclique (LFO) = barberpole / flanger.
+
+  • HALO = FDN 8 lignes :
+    ```
+    fdn(size, time, damping) = ... // 8 delay lines parallèles
+    // Matrice de Hadamard + filtres d'absorption
+    ```
+
+  • COLOR = filtre SVF. En FAUST : `fi.svf(freq, Q, mode)`.
+    Mode LP/BP/HP selon position du potard.
+
+  • SKEW = LFO sinusoïdal, L/R avec déphasage de 90-180° :
+    ```
+    skewL = os.osc(rate) * depth;
+    skewR = os.osc(rate, phaseOffset);
+    ```
+
+  • Particularité : le feedback peut devenir infini (commenté par
+    Make Noise comme "take the HALO too far").
+
+
+--- 20.3  SPECTRAPHON — Oscillateur Spectral / Additif ---
+
+Double cœur synthèse additive + analyse spectrale FFT.
+Côté A : analyse FFT de l'entrée externe.
+Côté B : synthèse additive (61 partiels).
+Cross-modulation entre A et B.
+
+--- SPECS DSP ---
+
+  • SR : 48 kHz, 24-bit
+  • MCU : STM32 H7 series (Cortex-M7)
+  • Côté A : 123 bins FFT, fenêtrage Hann, 50% overlap
+  • Côté B : 61 oscillateurs sinusoïdaux additifs
+  • Interpolation spectrale entre frames FFT
+  • Cross-modulation analogique/numérique entre A et B
+
+--- PARAMÈTRES ---
+
+  Param           | Description
+  ----------------|----------------------------------------------------------
+  FREQ A / FREQ B | Pitch fondamental de chaque côté
+  HARMONIC SPREAD | Distribution des partiels (compression ↔ dilatation)
+  PARTIALS        | Nombre de partiels (A: 123, B: 61)
+  SYMMETRY        | Balance pairs/impairs (enveloppe spectrale)
+  WARP            | Modulation de phase/fréquence des partiels
+                  | Distorsion de l'espace spectral
+  MORPH           | Interpolation spectrale entre A et B
+  CAPTURE         | Freeze de la trame FFT courante
+  MOD             | Cross-modulation AM/FM/RM entre A et B
+
+--- SIGNAL FLOW ---
+
+  Side A (Analysis) :              Side B (Synthesis) :
+    External Input                   Internal Generator
+    → FFT (123 bins)                → 61 sinus oscillators
+    → Peak Detection                → Harmonic Spread
+    → Spectral Envelope             → Symmetry (even/odd)
+    → Capture (freeze)              → WARP
+    → MOD → Side B                  → MOD → Side A
+
+  A + B → Cross-modulation (AM/FM/RM)
+    → Warp / Morph
+    → Output (stéréo possible via spread)
+
+--- FAUST HINTS ---
+
+  • Côté A = phase vocoder simplifié (123 bins au lieu de 512-1024).
+    En FAUST : `fft.lib` avec 256 pt FFT, Hann, overlap 2.
+
+  • Côté B = synthèse additive pure :
+    ```
+    partial(n, freq, amp) = os.osc(freq * n) * amp[n];
+    additive(bank, freq, amps) = sum(n, partial(n, freq, amps[n]));
+    // 61 oscillateurs en parallèle
+    ```
+
+  • SPREAD = mapping des partiels :
+    Linéaire → partiels harmoniques (f, 2f, 3f...)
+    Logarithmique → compression des hautes fréquences
+    Étiré → inharmonicité
+
+  • SYMMETRY = balance pair/impair. En FAUST :
+    ```
+    amps[n] = baseAmp * select2(n % 2, evenGain, oddGain);
+    ```
+
+  • WARP = décalage de phase des oscillateurs ou modulation
+    de fréquence individuelle par partiel.
+
+  • CAPTURE = freeze de la dernière frame FFT analysée.
+    Même principe que le freeze S-4 ou Degrader.
+
+  • Simplification possible sans FFT :
+    - Remplacer l'analyse par un filtre bank fixe (comme Filterbank
+      Tonverk — voir section 3.7)
+    - 61 bandes → 61 oscillateurs
+    - Enveloppe spectrale via RMS par bande
+
+
+--- 20.4  ERBE-VERB — Réverbération FDN (discontinued) ---
+
+Module de réverbération 100 % DSP. FDN à 8 lignes à retard,
+matrice de Hadamard, filtres d'absorption.
+
+--- SPECS DSP ---
+
+  • SR : 48 kHz, 24-bit
+  • DSP dédié (Freescale / NXP)
+  • FDN : 8 lignes à retard modulées
+  • Matrice de Hadamard (orthogonale, pas de coloration)
+  • Filtres d'absorption (LP/HP) dans chaque ligne
+  • LFO sinusoïdal modulant les lignes (anti-métallique)
+
+--- PARAMÈTRES ---
+
+  Param     | Description
+  ----------|----------------------------------------------------------
+  TIME      | Gain de feedback (durée de décroissance)
+  SIZE      | Longueur des lignes à retard (taille de la pièce)
+  DIFFUSION | Densité des réflexions (allpass/peigne)
+  MOD       | LFO modulant les lignes (réduction de métallique)
+  DECAY     | Atténuation haute fréquence (damping)
+  ABSORB    | Atténuation basse fréquence
+  FILTER    | LP/HP en sortie
+  FREEZE    | Maintien du feedback à l'infini
+
+--- SIGNAL FLOW ---
+
+  Input
+    → Diffusion (allpass cascade)
+    → FDN (8 lines × Hadamard matrix)
+    → DECAY (HP damping) / ABSORB (LP damping)
+    → MOD (LFO modulation on delay length)
+    → FREEZE gate (feedback hold)
+    → Output Filter (LP/HP)
+    → Output
+
+--- FAUST HINTS ---
+
+  • Structure FDN de base en FAUST :
+    ```
+    // 8 lignes de delay
+    d1 = de.delay(input, maxDelay, t1);
+    d2 = de.delay(input, maxDelay, t2);
+    // ... 8 lignes
+    // Matrice de Hadamard 8×8
+    // Filtre d'absorption par ligne
+    // Somme des lignes
+    ```
+
+  • SIZE = longueur des delays. En FAUST :
+    `ti = baseTime * sizeFactor`
+
+  • DECAY = damping haute fréquence.
+    `fi.lowpass(freq, 1)` dans chaque ligne.
+
+  • ABSORB = damping basse fréquence.
+    `fi.highpass(freq, 1)` dans chaque ligne.
+
+  • MOD = LFO sin sur les temps de delay :
+    `ti = baseTime * (1 + lfo * modDepth)`
+
+  • FREEZE = `select2(gate, normalFeedback, 1.0)` — le feedback
+    est gelé à son niveau actuel.
+
+  • DIFFUSION = 4-8 allpass en série avant le FDN.
+    ```
+    diff = fi.allpass(time1, gain1) : fi.allpass(time2, gain2) : ...
+    ```
+
+  • Pour une reverb FDN complète, utiliser `re.stereo_fdn_demo`
+    comme base et modifier les paramètres.
+
+
+--- NOTE FAUST MAKE NOISE ---
+
+  • Morphagene est le meilleur candidat FAUST : granulaire
+    avec overlap-add, fenêtrage multiple, probabilité.
+
+  • Spectraphon est le plus exigeant : FFT + additive.
+    Une version simplifiée (filtres résonants au lieu de FFT)
+    est faisable sans phase vocoder.
+
+  • Mimeophon combine Karplus-Strong + FDN — ce couplage
+    est rare et original.
+
+  • Erbe-Verb est un FDN classique (comme Supervoid mais
+    avec plus de contrôle sur l'absorption).
+
+  • QPAS, Maths, 0-Coast, Strega, 0-CTRL sont majoritairement
+    analogiques — pas de DSP audio à référencer ici.
+
+
+======================================================================
+SOURCES
+======================================================================
+
+  • Elektron — https://www.elektron.se
+    Tonverk_Manual.pdf (pages 86-97)
+    Syntakt_Manual.pdf (OS 1.40, pages 62-71)
+    Digitone_Manual.pdf (OS 1.41, pages 60-64)
+    Octatrack_MK2_User_Manual.pdf
+    Analog_Rytm_MK2_User_Manual.pdf
+    Analog_Four_MK2_User_Manual.pdf
+    Machinedrum_SPS-1_User_Manual.pdf
+    Monomachine_SFX-6_User_Manual.pdf
+
+  • Torso Electronics — https://torsoelectronics.com
+    Torso S-4 product page + tech specs
+    Torso T-1 Eurorack Sequencer specs
+    Torso TS-1 Desktop Sequencer specs
+
+  • Yamaha SY Series — Manuals & synth history archives
+
+  • Teenage Engineering — https://teenage.engineering
+    OP-1 User Manual
+    OP-Z User Manual
+
+  • Rossum — https://rossum-electro.com
+    Panharmonium product page + user manual
+
+  • Korg — https://www.korg.com
+    Electribe EMX-1 / ESX-1 Manual
+    Electribe 2 / E2S User Manual
+
+  • Make Noise — https://makenoisemusic.com
+    Morphagene User Manual
+    Mimeophon User Manual
+    Spectraphon User Manual
+    Erbe-Verb User Manual (archived)
+
+  • FAUST — https://faust.grame.fr
+    Libraries : stdfaust.lib, dm.lib, filter.lib, re.lib, de.lib, etc.
+
+======================================================================
+  FIN DU DOCUMENT
+======================================================================
