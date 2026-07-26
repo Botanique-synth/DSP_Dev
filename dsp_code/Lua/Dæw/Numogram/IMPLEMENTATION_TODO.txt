@@ -1,0 +1,455 @@
+================================================================================
+NUMOGRAM MACHINE - PROJECT CONTEXT & IMPLEMENTATION ROADMAP
+================================================================================
+
+PROJECT OVERVIEW:
+-----------------
+This is a Faust DSP project building an Elektron-inspired machine that blends:
+- Drum synthesis (kick, snare, hats, percussive elements)
+- Synth machines (FM, subtractive, granular, wavetable)
+- Samplers (for one-shot and looped samples)
+- A sophisticated 16-step sequencer with numogram-based parameter mapping
+
+The core concept uses NUMOGRAM DIAGRAM geometry to organize and relate:
+- Machine types to numbers (0=clock, 8=drums, 1=synth, 7=sampler, etc.)
+- Step positions to harmonic relationships
+- Parameter values to numogram ratios
+
+CURRENT STATE (Working):
+- Clock system (zero) - Functional BPM and run control
+- 16-step sequencer (nine) - Working but needs refactoring
+- Drum synthesis (eight) - 4 drum machines: khique, snr, Hate, additive
+- Mixer/Effects (one) - 6-channel mixer with delay, reverb, EQ
+- Post-processing (postseq) - Routing logic
+
+CURRENT STATE (Broken/Stub):
+- synth_fx - COMPLETELY UNIMPLEMENTED (returns zeros only)
+- Sampler - Not implemented
+- Numogram integration - Partial (needs deeper parameter mapping)
+- Pattern chaining - Not implemented
+- Parameter locks - Not implemented
+
+================================================================================
+ARCHITECTURE DIAGRAM:
+================================================================================
+
+    [CLOCK: zero]
+        |
+        v
+    [SEQUENCER: nine] --16-step, numogram-based--
+        |
+    +---+---+---+---+
+    |   |   |   |   |
+  [DRUMS: eight]  [SYNTH1: synth_fx]  [SYNTH2: synth_fx]  [SYNTH3: synth_fx]
+    |   |   |   |   |
+    +---+---+---+---+
+        |
+        v
+    [MIXER: one] --6-channel, delay, reverb, EQ--
+        |
+        v
+    [OUTPUT]
+
+Target Architecture:
+    [CLOCK: zero]
+        |
+        v
+    [SEQUENCER: nine] --16-step--
+        |
+    +---+---+---+---+---+
+    |   |   |   |   |   |
+  [DRUMS: eight]  [SYNTH1]  [SYNTH2]  [SAMPLER: seven]  [SYNTH3]
+    |   |   |   |   |   |
+    +---+---+---+---+---+
+        |
+        v
+    [MIXER: one] --Effects, routing--
+        |
+        v
+    [OUTPUT]
+
+================================================================================
+PRIORITY TODO LIST:
+================================================================================
+
+PHASE 1: CRITICAL FIXES (Do These First - Code Won't Work Without)
+--------------------------------------------------------------
+
+[ ] 1. IMPLEMENT synth_fx FUNCTION (Location: line 636-642)
+    Status: STUB ONLY - Returns zeros, completely non-functional
+    Action: Replace with actual synth machine implementation
+    File: numberfunctions.dsp
+    
+    Implementation Options:
+    A) Quick fix: Simple oscillator with envelope
+    B) Better: FM synthesis with numogram-based parameters
+    C) Best: Machine selector (FM/Subtractive/Granular/Wavetable)
+    
+    Recommended: Start with Option B, evolve to C
+    
+    Parameters to use:
+    - t1,t2,t3,t4: Trigger inputs from sequencer lanes
+    - tms1,tms2,tms3: Numogram position modifiers
+    - phasor: Timing phase information
+
+[ ] 2. FIX CLOCK IN zero COMPONENT
+    Status: Suspicious operation `(_*-1:ba.spulse(1))` 
+    Action: Review and fix the main_clock function
+    File: numberfunctions.dsp, line ~20
+    Current: timephasor <: (_*-1:ba.spulse(1)),_
+    Issue: The `_-1` before spulse seems incorrect
+    Fix: Should likely be just `ba.spulse(1)` without the negation
+
+[ ] 3. VERIFY SEQUENCER TIMING
+    Status: Complex logic, potential timing issues
+    Action: Test if sequencer triggers are properly aligned with BPM
+    File: nine component
+    Test: Connect a simple oscillator to trig output, verify timing
+
+[ ] 4. TEST CURRENT DRUM SOUNDS
+    Status: Appears implemented but untested
+    Action: 
+    - Mute synth_fx instances (they return zeros anyway)
+    - Verify each drum machine (khique, snr, Hate, additive) makes sound
+    - Check trigger responsiveness
+    - Test parameter ranges (freq, decay, spread, etc.)
+
+================================================================================
+PHASE 2: CORE FEATURES (Make It Functional)
+--------------------------------------------------------------
+
+[ ] 5. IMPLEMENT BASIC SYNTH MACHINE
+    After fixing synth_fx, create a basic synth:
+    - Simple oscillator (sine/saw/square) with envelope
+    - Numogram-based pitch mapping
+    - Trigger responsive
+    
+    Suggested structure:
+    synth_machine(trig, num_pos) = 
+        note = 60 + (num_pos % 24)  // 2 octave range
+        freq = 440 * ma.pow(2, (note-69)/12)
+        osc = os.saw(freq)  // or other waveform
+        env = en.adsr(0.001, 0.1, 0.3, 0.1, trig)
+        out = osc * env * 0.5
+
+[ ] 6. ADD PARAMETER LOCKS PER STEP
+    Status: Not implemented
+    Action: For each step in sequencer, allow locking:
+    - Pitch/note
+    - Machine type selection
+    - Velocity/amplitude
+    - Effect sends
+    
+    Implementation: Add arrays of parameters indexed by step number
+
+[ ] 7. IMPLEMENT PATTERN CHAINING
+    Status: Not implemented
+    Action: Allow chaining multiple 16-step patterns
+    - Pattern A and Pattern B
+    - Switch via control or automatically
+    - Each pattern can have different machine assignments
+
+[ ] 8. ADD BASIC SAMPLER (Component seven)
+    Status: Not implemented
+    Action: Create a simple sampler component
+    - Sample selection (index-based)
+    - Trigger input
+    - Pitch control
+    - Start/length parameters
+    - Basic envelope
+
+================================================================================
+PHASE 3: NUMOGRAM INTEGRATION (Unique Features)
+--------------------------------------------------------------
+
+[ ] 9. DEEP NUMOGRAM PARAMETER MAPPING
+    Status: Partial implementation
+    Action: Use numogram geometry to drive:
+    - Note pitches (chromatic based on position)
+    - Machine type selection per step
+    - Effect routing
+    - Parameter modulation
+    
+    Example mapping:
+    - Step 0: Clock/Master
+    - Step 8: Drums (already partially done)
+    - Step 1: Synth Machine 1
+    - Step 2: Synth Machine 2
+    - Step 7: Sampler
+    - Other steps: Variations and combinations
+
+[ ] 10. IMPLEMENT NUMOGRAM HARMONIC SERIES
+    Status: Not implemented
+    Action: Use numogram ratios for frequency relationships
+    - Example: freq = base * (3/2)^(step % 7)
+    - Create harmonically related sequences
+    - Map to musical intervals
+
+[ ] 11. ADD NUMOGRAM VISUAL FEEDBACK
+    Status: Not implemented
+    Action: Create UI elements that show:
+    - Active numogram positions
+    - Relationships between active steps
+    - Current machine assignments
+    
+    Implementation: Use bargraphs arranged in numogram pattern
+
+[ ] 12. NUMOGRAM-BASED EFFECT ROUTING
+    Status: Not implemented
+    Action: Route different machines to effects based on numogram
+    - Even steps -> Delay
+    - Odd steps -> Reverb
+    - Prime steps -> Both
+    - etc.
+
+================================================================================
+PHASE 4: ELEKTRON WORKFLOW FEATURES
+--------------------------------------------------------------
+
+[ ] 13. ADD PERFORMANCE MACROS
+    Status: Not implemented
+    Action: Add XY pads or macro controls that affect multiple parameters
+    - Filter + Resonance
+    - Attack + Release
+    - Pitch + Modulation
+    - etc.
+
+[ ] 14. IMPLEMENT MICROTIMING
+    Status: Not implemented
+    Action: Add per-step timing offsets
+    - Early/late trigger by milliseconds
+    - Random timing variation
+    - Swing/shuffle
+
+[ ] 15. ADD CONDITIONAL TRIGGERS
+    Status: Not implemented
+    Action: Per-step probability and repeat controls
+    - Probability: 0-100% chance of triggering
+    - Repeats: 1-8 repeats per trigger
+    - Ratcheting: Sub-division repeats
+
+[ ] 16. IMPLEMENT PARAMETER AUTOMATION
+    Status: Not implemented
+    Action: Record and playback parameter changes
+    - Per-step automation
+    - Global automation lanes
+    - Automation length (1-16 steps)
+
+================================================================================
+PHASE 5: POLISH & OPTIMIZATION
+--------------------------------------------------------------
+
+[ ] 17. REFACTOR SEQUENCER CODE
+    Status: Heavy duplication
+    Action: Replace hardcoded B00-B15 with loop-based implementation
+    - Use par(i, 16, ...) for step generation
+    - Create reusable functions for binary operations
+    - Reduce code size by 70%+
+    
+    Current: ~100 lines of duplicated step logic
+    Target: ~30 lines with loops
+
+[ ] 18. OPTIMIZE CPU USAGE
+    Status: Likely inefficient
+    Action: 
+    - Remove redundant calculations
+    - Use si.smoo only where needed
+    - Consider polyphony limits
+    - Test with high BPM
+
+[ ] 19. ADD PROPER UI GROUPING
+    Status: Some grouping exists, can be better
+    Action: 
+    - Organize controls by function
+    - Consistent naming conventions
+    - Logical tab/group structure
+    - Color coding for different sections
+
+[ ] 20. IMPLEMENT PRESET MANAGEMENT
+    Status: Not implemented
+    Action: 
+    - Save/load complete machine state
+    - Individual pattern presets
+    - Kit presets (drums + synths)
+    - Global settings presets
+
+[ ] 21. ADD MIDI CONTROL
+    Status: Not implemented
+    Action: 
+    - MIDI note input for triggers
+    - MIDI CC for parameter control
+    - MIDI learn functionality
+    - Note mapping to machines
+
+[ ] 22. IMPLEMENT AUDIO INPUT PROCESSING
+    Status: Not implemented
+    Action: 
+    - External audio input
+    - Input effects chain
+    - Sidechain compression
+    - Audio-to-trigger conversion
+
+================================================================================
+TESTING CHECKLIST:
+================================================================================
+
+BEFORE STARTING IMPLEMENTATION:
+[ ] Verify Faust environment is properly set up
+[ ] Test that current code compiles (even with stub synth_fx)
+[ ] Confirm audio output is working
+[ ] Test MIDI input/output if applicable
+
+AFTER EACH CHANGE:
+[ ] Code compiles without errors
+[ ] No audio glitches or dropouts
+[ ] CPU usage is reasonable (<50% at 44.1kHz)
+[ ] All existing functionality still works
+[ ] New features behave as expected
+
+SPECIFIC TESTS:
+[ ] Test clock at various BPM (40-200)
+[ ] Test run/stop functionality
+[ ] Test each drum machine individually
+[ ] Test trigger timing accuracy
+[ ] Test sequencer step navigation
+[ ] Test parameter ranges (min/max/center)
+[ ] Test mixer routing and levels
+[ ] Test effects (delay, reverb) individually
+[ ] Test stereo imaging
+
+EDGE CASES TO TEST:
+[ ] BPM = 0 (paused)
+[ ] BPM = maximum
+[ ] All sequencer steps active
+[ ] No sequencer steps active
+[ ] Rapid parameter changes
+[ ] High feedback values on effects
+[ ] Extreme parameter values
+
+================================================================================
+FILE LOCATIONS:
+================================================================================
+
+Main File: /Users/cleho/Downloads/Dæw/Numogram/numberfunctions.dsp
+
+Components:
+- zero (Clock): Line ~13-25
+- nine (Sequencer): Line ~27-300
+- eight (Drums): Line ~302-450
+- one (Mixer/Effects): Line ~452-635
+- synth_fx (STUB): Line 636-642
+- postseq (Post-processing): Line ~10-12
+
+================================================================================
+QUICK START - NEXT 5 STEPS:
+================================================================================
+
+If you're ready to start NOW, do these in order:
+
+1. BACKUP YOUR FILE
+   cp numberfunctions.dsp numberfunctions.dsp.backup
+
+2. TEST CURRENT STATE
+   - Compile and run
+   - Verify drums work
+   - Confirm sequencer triggers are firing
+
+3. FIX THE CLOCK (5 minutes)
+   In zero component, line ~22:
+   Change: timephasor <: (_*-1:ba.spulse(1)),_
+   To:     timephasor <: ba.spulse(1),_
+   (Remove the `_-1` which seems incorrect)
+
+4. IMPLEMENT BASIC synth_fx (30 minutes)
+   Replace lines 636-642 with:
+   
+   synth_fx(t1,t2,t3,t4,tms1,tms2,tms3,phasor) = out
+   with {
+       // Combine triggers from all 4 lanes
+       main_trig = (t1 + t2 + t3 + t4) : ba.impulsify;
+       
+       // Numogram position (combine tms parameters)
+       num_pos = tms1*16 + tms2*4 + tms3;
+       
+       // Calculate note from numogram position
+       note = 60 + (int(num_pos) % 24); // 2 octaves
+       freq = 440.0 * ma.pow(2.0, (note - 69.0)/12.0);
+       
+       // Simple subtractive synth
+       osc = os.saw(freq) + os.square(freq*1.5)*0.3;
+       env = en.adsr(0.001, 0.1, 0.3, 0.1, main_trig);
+       filtered = osc : fi.lowpass(2000.0, 0.5);
+       
+       out = filtered * env * 0.5, filtered * env * 0.5;
+   };
+
+5. TEST THE FIXES
+   - Verify synth_fx now produces sound
+   - Check that it responds to sequencer triggers
+   - Test different numogram positions (tms1,tms2,tms3)
+
+================================================================================
+RESOURCES & REFERENCES:
+================================================================================
+
+Faust Documentation:
+- https://faust.grame.fr/doc/manual/index.html
+- https://faust.grame.fr/doc/libraries/index.html
+
+Elektron Workflow Inspiration:
+- Parameter locks: Each step can have unique parameter values
+- Pattern chaining: Link patterns together for longer sequences
+- Performance macros: Single control affects multiple parameters
+- Conditional triggers: Probability, repeats, ratcheting
+
+Numogram Resources:
+- Gurdjieff Enneagram: Study the relationships between numbers
+- Harmonic series: Use numogram ratios for musical intervals
+- Geometric patterns: Visual representation of step relationships
+
+Faust Tips:
+- Use par(i, N, expr) for loops
+- Use seq(i, N, expr) for sequences
+- Use ba.if(cond, then, else) for conditional logic
+- Use si.smoo for smoothing parameters
+- Use ma.SR for sample rate dependent calculations
+- Use de.delay for sample-accurate delays
+
+================================================================================
+NOTES:
+================================================================================
+
+1. The current sequencer (nine) has duplicate cur_step functions. This works but
+   wastes CPU. Refactor when you have time, but it's not urgent.
+
+2. The delay in component one has very long max_del (15*ma.SR). At 44.1kHz, this
+   is ~650ms. Consider if this is sufficient for your needs.
+
+3. The tanh clipping in eight component is good for preventing digital distortion.
+   Keep this approach for synth_fx as well.
+
+4. Consider adding a master volume control. Currently there isn't one, which makes
+   it hard to control overall output level.
+
+5. The mixer (one) has 6 channels but you're only feeding it 4 sources. You have
+   room for expansion (add sampler, add more synths).
+
+================================================================================
+TRACKING YOUR PROGRESS:
+================================================================================
+
+Use this format to track completion:
+
+[X] = Complete and tested
+[ ] = Not started
+[~] = Started but not complete
+[!] = Complete but untested
+[*] = Complete, tested, needs refinement
+
+Update the checkboxes as you work through the list.
+
+Last Updated: [Date]
+Current Focus: [What you're working on]
+Next Priority: [What to do next]
+
+================================================================================
