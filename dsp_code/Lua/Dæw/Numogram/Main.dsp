@@ -1,5 +1,4 @@
 import("stdfaust.lib");
-b = library("beatroot.dsp");
 n = library("numberfunctions.dsp");
 
 
@@ -13,8 +12,9 @@ two         =  vgroup("[0]0",_);
 one         =  vgroup("[4]1",_*.1);              // mixer 
 
 three       =  vgroup("[5]3",_ <: b.krush(1));
-six        =  vgroup("[0]0",_);
+six        =  vagroup("[0]0",_);
 
 process = beatroot ;
 
-beatroot = tgroup("channels",n.zero : n.nine : n.eight : one : three );
+beatroot = tgroup("channels",n.zero : n.nine <: (n.eight,n.synth_fx,n.synth_fx,n.synth_fx,n.synth_fx): n.one );
+// zero:nine<:(eight,synth_fx,synth_fx,synth_fx):one for now in numberfunctions 

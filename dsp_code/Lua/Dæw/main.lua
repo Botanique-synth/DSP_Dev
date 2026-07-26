@@ -54,7 +54,7 @@ function love.load()
         sigilfont = love.graphics.newFont("fonts/goetic/NIGOA___.TTF", 300)
     end)
 
-    love.window.setMode(1024, 600, {fullscreen = true})
+    love.window.setMode(1024, 600, {fullscreen = false, resizable = true})
     W_width, W_height = love.graphics.getDimensions()
 end
 
