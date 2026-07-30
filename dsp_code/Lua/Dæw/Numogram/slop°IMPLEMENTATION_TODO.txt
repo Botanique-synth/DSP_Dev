@@ -1,0 +1,825 @@
+================================================================================
+NUMOGRAM MACHINE - PROJECT CONTEXT & IMPLEMENTATION ROADMAP
+================================================================================
+UPDATED: July 28, 2026
+STATUS: Active Development - Main.dsp Integrated
+
+================================================================================
+PROJECT OVERVIEW:
+================================================================================
+
+This is a Faust DSP project building an Elektron-inspired machine that blends:
+- Drum synthesis (kick, snare, hats, percussive elements)
+- Synth machines (FM, subtractive, granular, wavetable)
+- Samplers (for one-shot and looped samples)
+- A sophisticated 16-step sequencer with numogram-based parameter mapping
+- Mixer with effects (delay, reverb, EQ)
+
+The core concept uses NUMOGRAM DIAGRAM geometry to organize and relate:
+- Machine types to numbers (0=clock, 8=drums, 1=synth, 7=sampler, etc.)
+- Step positions to harmonic relationships
+- Parameter values to numogram ratios
+
+LUA INTEGRATION: main.lua provides visual interface with numogram display
+FAUST ENGINE: Main.dsp contains all DSP processing
+
+================================================================================
+CURRENT ARCHITECTURE (from Main.dsp):
+================================================================================
+
+process = Plex <: Timecircuit : Warp;
+
+Component Structure:
+├── Plex (zero + nine)
+│   ├── zero: Clock system - BPM, run control, phasor generation
+│   └── nine: 16-step sequencer with numogram-based note generation
+│
+├── Timecircuit (eight + 3x synth_fx)
+│   ├── eight: Drum synthesis (khique, snr, Hate, additive)
+│   ├── synth_fx: Synth machine 1 (STUB - needs implementation)
+│   ├── synth_fx: Synth machine 2 (STUB - needs implementation)
+│   └── synth_fx: Synth machine 3 (STUB - needs implementation)
+│
+└── Warp (one): 6-channel mixer with effects
+    ├── 4 input channels (from drums + synths)
+    ├── Delay effect with dispersion
+    ├── Reverb (stereo freeverb)
+    ├── Per-channel EQ (low/high shelf, bell, passes)
+    └── Per-channel volume, delay send, reverb send
+
+================================================================================
+CURRENT STATE:
+================================================================================
+
+[WORKING] - Clock system (zero):
+- BPM control (p1: 0-1000 mapped to BPM)
+- Run/stop toggle (p2)
+- Phasor generation for timing
+- Counter with 16-step modulo
+- Trigger generation from phasor
+
+[WORKING] - Sequencer (nine):
+- 16-step sequencer with current step display
+- 4 parallel sequencers (for f, v, c parameters)
+- Numogram-based quantized frequency generation
+- 13 different scales available (ionian, dorian, phrygian, etc.)
+- Note calculation from numogram position
+
+[WORKING] - Drum synthesis (eight):
+- 4 drum machines with individual triggers:
+  * khique: Kick drum with pitch envelope and saturation
+  * snr: Snare with noise layer
+  * Hate: Hi-hat with square wave harmonics and noise
+  * additive: Multi-oscillator additive synthesis
+- All drums sum together with tanh clipping
+- Trigger impulsification for clean attacks
+
+[WORKING] - Mixer/Effects (Warp/one):
+- 6-channel mixer (currently only 4 channels used)
+- Stereo delay with:
+  * Independent left/right delay times
+  * Feedback control
+  * Dispersion effect (16-tap allpass)
+  * Wow effect (LFO modulation)
+  * High/low pass filtering
+  * Wet/dry mix
+- Stereo reverb (freeverb) with:
+  * Feedback 1 & 2
+  * Dampening
+  * Spread control
+- Per-channel EQ:
+  * Low/high shelf (±12dB)
+  * Bell filter (frequency, bandwidth, gain)
+  * Low/high pass filters
+- Per-channel preamp with nonlinear processing
+
+[STUB/UNIMPLEMENTED] - synth_fx:
+- Currently returns zeros only
+- Needs full synth machine implementation
+- 3 instances in Timecircuit
+
+[NOT STARTED] - Sampler (seven):
+- Not present in current Main.dsp
+- Needs implementation for sampling functionality
+
+[PARTIAL] - Numogram Integration:
+- Basic note quantization implemented
+- Scale selection working
+- Deeper parameter mapping needed
+- Visual feedback in main.lua
+
+
+================================================================================
+PRIORITY TODO LIST:
+================================================================================
+
+PHASE 1: CRITICAL FIXES (Do These First - Code Won't Work Without)
+--------------------------------------------------------------
+
+[ ] 1. IMPLEMENT synth_fx FUNCTION
+    Status: STUB ONLY - Returns zeros, completely non-functional
+    Location: Main.dsp, lines 242-248
+    Action: Replace with actual synth machine implementation
+    
+    Implementation Options:
+    A) Quick fix: Simple oscillator with envelope
+    B) Better: FM synthesis with numogram-based parameters
+    C) Best: Machine selector (FM/Subtractive/Granular/Wavetable)
+    
+    Recommended: Start with Option B, evolve to C
+    
+    Parameters available:
+    - f1,v1,c1: Frequency, velocity, control from sequencer lane 1
+    - f2,v2,c2: Frequency, velocity, control from sequencer lane 2
+    - f3,v3,c3: Frequency, velocity, control from sequencer lane 3
+    - f4,v4,c4: Frequency, velocity, control from sequencer lane 4
+    - tphz: Time phasor for timing synchronization
+    
+    Current signature:
+    synth_fx(f1,v1,c1,f2,v2,c2,f3,v3,c3,f4,v4,c4,tphz) = out
+
+[ ] 2. TEST CURRENT DRUM SOUNDS
+    Status: Appears implemented but untested in Main.dsp
+    Action: 
+    - Mute synth_fx instances (they return zeros anyway)
+    - Verify each drum machine (khique, snr, Hate, additive) makes sound
+    - Check trigger responsiveness
+    - Test parameter ranges (freq, decay, spread, etc.)
+    
+    Note: Drums are triggered when v1,v2,v3,v4 > 0 (converted to impulses)
+
+[ ] 3. VERIFY SEQUENCER TIMING
+    Status: Complex logic, needs testing
+    Action: Test if sequencer triggers are properly aligned with BPM
+    - Connect a simple oscillator to trig output
+    - Verify timing at various BPMs (40-200)
+    - Check run/stop functionality
+
+[ ] 4. FIX SEQUENCER BUG
+    Status: Bug in control lane selection
+    Location: Main.dsp, line ~55 in nine component
+    Current: step_c = hgroup("[2]ctl_1",par(i,16,v(i)) : ba.selectn(16,cur_note));
+    Fix:     step_c = hgroup("[2]ctl_1",par(i,16,c(i)) : ba.selectn(16,cur_note));
+    (Use c(i) instead of v(i) for control lane)
+
+
+PHASE 2: CORE FEATURES (Make It Functional)
+--------------------------------------------------------------
+
+[ ] 5. IMPLEMENT BASIC SYNTH MACHINE
+    After fixing synth_fx, create a basic synth:
+    - Simple oscillator (sine/saw/square) with envelope
+    - Numogram-based pitch mapping
+    - Trigger responsive
+    - Use available parameters (f, v, c) from sequencer
+    
+    Suggested structure:
+    synth_machine(trig, freq_param, vel_param, ctrl_param) = 
+        note = 60 + (freq_param * 48)  // Full note range
+        freq = 440 * ma.pow(2, (note-69)/12)
+        osc = os.saw(freq) + os.square(freq*1.5)*0.3
+        env = en.adsr(0.001, 0.1, 0.3, 0.1, trig)
+        filtered = osc : fi.lowpass(2000.0 * (1+ctrl_param), 0.5)
+        out = filtered * env * vel_param * 0.5
+
+[ ] 6. ADD PARAMETER LOCKS PER STEP
+    Status: Not implemented
+    Action: For each step in sequencer, allow locking:
+    - Pitch/note
+    - Machine type selection
+    - Velocity/amplitude
+    - Effect sends
+    
+    Implementation: Add arrays of parameters indexed by step number
+    Current: sequencer uses ba.selectn(16,cur_note) for step selection
+
+[ ] 7. IMPLEMENT PATTERN CHAINING
+    Status: Not implemented
+    Action: Allow chaining multiple 16-step patterns
+    - Pattern A and Pattern B
+    - Switch via control or automatically
+    - Each pattern can have different machine assignments
+    
+    Suggested: Add pattern selection parameter, double sequencer
+
+[ ] 8. ADD BASIC SAMPLER (Component seven)
+    Status: Not implemented
+    Action: Create a simple sampler component
+    - Sample selection (index-based)
+    - Trigger input
+    - Pitch control
+    - Start/length parameters
+    - Basic envelope
+    
+    Add to process chain: Plex <: Timecircuit,seven : Warp;
+
+
+PHASE 3: NUMOGRAM INTEGRATION (Unique Features)
+--------------------------------------------------------------
+
+[ ] 9. DEEP NUMOGRAM PARAMETER MAPPING
+    Status: Partial implementation
+    Action: Use numogram geometry to drive:
+    - Note pitches (chromatic based on position)
+    - Machine type selection per step
+    - Effect routing
+    - Parameter modulation
+    
+    Current implementation in nine:
+    - cur_note = int(out0) from Plex
+    - tune() function maps numogram position to frequency
+    - 13 scales available via qu.quantize
+    
+    Example mapping (extend):
+    - Step 0: Clock/Master
+    - Step 8: Drums (already partially done)
+    - Step 1: Synth Machine 1
+    - Step 2: Synth Machine 2
+    - Step 7: Sampler
+    - Other steps: Variations and combinations
+
+[ ] 10. IMPLEMENT NUMOGRAM HARMONIC SERIES
+    Status: Not implemented
+    Action: Use numogram ratios for frequency relationships
+    - Example: freq = base * (3/2)^(step % 7)
+    - Create harmonically related sequences
+    - Map to musical intervals
+    
+    Current: Uses qu.quantize for scale-based quantization
+    Extend: Add harmonic series mode
+
+[ ] 11. ADD NUMOGRAM VISUAL FEEDBACK
+    Status: Partially in main.lua
+    Action: Create Faust UI elements that show:
+    - Active numogram positions
+    - Relationships between active steps
+    - Current machine assignments
+    
+    Implementation: Use bargraphs arranged in numogram pattern
+    
+    Note: main.lua already has numogram() function with positions
+    for {3,6,2,7,5,4,1,8,9,0}
+
+[ ] 12. NUMOGRAM-BASED EFFECT ROUTING
+    Status: Not implemented
+    Action: Route different machines to effects based on numogram
+    - Even steps -> Delay
+    - Odd steps -> Reverb
+    - Prime steps -> Both
+    - Center steps -> None (dry)
+    
+    Current: Mixer has per-channel send controls (sa1-sa6, sb1-sb6)
+    Extend: Automate sends based on numogram position
+
+
+PHASE 4: ELEKTRON WORKFLOW FEATURES
+--------------------------------------------------------------
+
+[ ] 13. ADD PERFORMANCE MACROS
+    Status: Not implemented
+    Action: Add XY pads or macro controls that affect multiple parameters
+    - Filter + Resonance
+    - Attack + Release
+    - Pitch + Modulation
+    - Effect sends
+
+[ ] 14. IMPLEMENT MICROTIMING
+    Status: Not implemented
+    Action: Add per-step timing offsets
+    - Early/late trigger by milliseconds
+    - Random timing variation
+    - Swing/shuffle
+    
+    Current: Uses os.hs_phasor for timing
+    Extend: Add per-step phase offsets
+
+[ ] 15. ADD CONDITIONAL TRIGGERS
+    Status: Not implemented
+    Action: Per-step probability and repeat controls
+    - Probability: 0-100% chance of triggering
+    - Repeats: 1-8 repeats per trigger
+    - Ratcheting: Sub-division repeats
+    
+    Implementation: Use ba.random for probability, loops for repeats
+
+[ ] 16. IMPLEMENT PARAMETER AUTOMATION
+    Status: Not implemented
+    Action: Record and playback parameter changes
+    - Per-step automation
+    - Global automation lanes
+    - Automation length (1-16 steps)
+
+
+PHASE 5: POLISH & OPTIMIZATION
+--------------------------------------------------------------
+
+[ ] 17. REFACTOR SEQUENCER CODE
+    Status: Uses par(i,16,...) but has minor bug
+    Action: Clean up and optimize
+    - Fix c(i) vs v(i) bug in control lane
+    - Verify par() usage is correct
+    - Reduce redundant calculations
+    - Improve code readability
+
+[ ] 18. OPTIMIZE CPU USAGE
+    Status: Likely inefficient
+    Action: 
+    - Remove redundant calculations
+    - Use si.smoo only where needed
+    - Consider polyphony limits
+    - Test with high BPM
+    
+    Note: Delay in Warp uses max_del = 15*ma.SR (~650ms at 44.1kHz)
+
+[ ] 19. ADD PROPER UI GROUPING
+    Status: Some grouping exists, can be better
+    Action: 
+    - Organize controls by function
+    - Consistent naming conventions
+    - Logical tab/group structure
+    - Color coding for different sections
+
+[ ] 20. IMPLEMENT PRESET MANAGEMENT
+    Status: Not implemented
+    Action: 
+    - Save/load complete machine state
+    - Individual pattern presets
+    - Kit presets (drums + synths)
+    - Global settings presets
+
+[ ] 21. ADD MIDI CONTROL
+    Status: Not implemented
+    Action: 
+    - MIDI note input for triggers
+    - MIDI CC for parameter control
+    - MIDI learn functionality
+    - Note mapping to machines
+
+[ ] 22. IMPLEMENT AUDIO INPUT PROCESSING
+    Status: Not implemented
+    Action: 
+    - External audio input
+    - Input effects chain
+    - Sidechain compression
+    - Audio-to-trigger conversion
+
+================================================================================
+FAUST SNIPPETS LIBRARY
+================================================================================
+Use these pre-built components in your implementation
+
+---
+DRUM SYNTHESIS
+---
+
+// KHIQUE (Kick Drum) - From Main.dsp
+aa_khique(trig) = out
+with{
+    len = hslider("hlen [style:knob]",0.5,0,1,0.001);
+    pitch = hslider("hpit[style:knob]",0,0,1,0.001);
+    base = hslider("Bf[style:knob]",0,0,1,0.001);
+    sat = hslider("sat[style:knob]",0,0,1,0.001);
+    mod = hslider("mod[style:knob]",0,0,1,0.001);
+    decay_env(decay,trig) = trig : ba.line((10+50000*decay)*(1-trig));
+    upper = 200*(1+base); lower = 50*(1+base);
+    env = decay_env(len,trig);
+    f = decay_env(pitch/10,trig) : lower+(_*(upper-lower));
+    osc = os.CZhalfSine(os.sawNp(1,f/2,trig*2*ma.PI),mod)*env;
+    out = osc*(1+(5*sat)-env/2) : aa.tanh1;
+};
+
+// SNARE - From Main.dsp
+aa_snr(trig) = out
+with{
+    f = hslider("freq[style:knob]",200,200,500,1):si.smoo;
+    dec = hslider("decay[style:knob]",0,0,1,0.001);
+    n = hslider("noise[style:knob]",0,0,1,0.001);
+    env = en.are(0,dec,trig:ba.impulsify:ba.spulse(10));
+    out = env*(os.oscsin(f*(1+env))) + 5*env*env*n*no.noise/20;
+};
+
+// HATE (Hi-Hat) - From Main.dsp
+aa_hate(trig) = out
+with{
+    fh = hslider("freq_hat[style:knob]",1500,1500,2000,1):si.smoo;
+    spreadh = hslider("spread hat[style:knob]",0,0,1,0.001);
+    dech = hslider("decay[style:knob]",0,0,1,0.001);
+    nh = hslider("noise h[style:knob]",0,0,1,0.001);
+    env = en.are(0,dech,trig:ba.impulsify:ba.spulse(10));
+    s = 1.2 + spreadh/9;
+    summ = env*(os.square(fh) + os.square(fh*s) + os.square(fh*s*s) 
+           + os.square(fh*s*s*s) + os.square(fh*s*s*s*s))/6;
+    noise = 5*env*nh*no.noise/20;
+    out = (summ+noise) : fi.highpass(8,5000+fh/2);
+};
+
+// ADDITIVE DRUM - From Main.dsp
+aa_additive(trig) = out
+with{
+    f = hslider("freq[style:knob]",1,1,800,1):si.smoo;
+    spread = hslider("spread[style:knob]",0,0,1,0.001);
+    dec = (hslider("dec[style:knob]",0.5,0,1,0.01)+0.5)*8;
+    env = en.are(0.02,dec,trig:ba.spulse(100));
+    s = 1 + spread*3;
+    a = os.oscp(f,-dec); b = os.oscp(f*s,dec);
+    c = os.oscp(f*s*s,-dec); d = os.oscp(f*s*s*s,dec);
+    e = os.oscp(f*s*s*s*s,-dec); g = os.oscp(f*s*s*s*s*s,dec);
+    out = env^4*(a+b+c+d+e+g)/6;
+};
+
+// SIMPLE SUBTRACTIVE SYNTH (for synth_fx)
+aa_simple_synth(trig, freq_param, vel_param, ctrl_param) = out
+with{
+    note = 60 + (freq_param * 48); // 0-1 -> 60-108 (C4-C7)
+    freq = 440 * ma.pow(2, (note-69)/12);
+    saw = os.saw(freq);
+    square = os.square(freq*1.5);
+    waveform = ba.lininterp(ctrl_param, saw, square);
+    env = en.adsr(0.001, 0.1, 0.3, 0.1, trig);
+    cutoff = 200 + ctrl_param * 10000;
+    filtered = waveform : fi.lowpass(cutoff, 0.5);
+    out = filtered * env * vel_param * 0.5, filtered * env * vel_param * 0.5;
+};
+
+// FM SYNTH (2-operator)
+aa_fm_synth(trig, freq_param, vel_param, ctrl_param) = out
+with{
+    carrier_freq = 440 * ma.pow(2, (60 + freq_param * 48 - 69)/12);
+    mod_freq = carrier_freq * 1.5;
+    mod_index = ctrl_param * 10;
+    mod = os.sinwave(mod_freq);
+    carrier = os.sinwave(carrier_freq + mod * mod_index);
+    env = en.adsr(0.01, 0.2, 0.5, 0.1, trig);
+    out = carrier * env * vel_param * 0.3 : fi.lowpass(5000, 0.3);
+};
+
+// KARPLUS-STRONG
+aa_karplus(freq, damp, trig) = out
+with{
+    maxDElL = 960;
+    filter = _ <: _,_' :> /(2);
+    delLength = ma.SR/freq;
+    impulse = trig : ba.impulsify;
+    string = +~(de.fdelay4(maxDElL,delLength-1) : filter : *(damp));
+    out = string * impulse * 0.5;
+};
+
+---
+SEQUENCER SNIPPETS
+---
+
+// 16-STEP TRIGGER SEQUENCER (optimized)
+aa_16step(bpm, run) = out
+with{
+    phasor = os.hs_phasor(1.0, bpm/60, run);
+    pulse = (1-phasor):ba.spulse(1);
+    count = ba.counter(pulse) % 16;
+    step(i) = checkbox("step_" + i);
+    out = par(i, 16, step(i) & (count == i) : ba.impulsify);
+};
+
+// NUMOGRAM QUANTIZER (from Main.dsp nine)
+aa_tune(bf, scale_typ, fin) = fout
+with{
+    Bf = 20 * pow(1000, bf);
+    Fin = 20 * pow(1000, fin);
+    scaleAt(0) = qu.ionian; scaleAt(1) = qu.dorian; scaleAt(2) = qu.phrygian;
+    scaleAt(3) = qu.lydian; scaleAt(4) = qu.mixo; scaleAt(5) = qu.eolian;
+    scaleAt(6) = qu.locrian; scaleAt(7) = qu.pentanat; scaleAt(8) = qu.kumoi;
+    scaleAt(9) = qu.natural; scaleAt(10) = qu.dodeca; scaleAt(11) = qu.dimin;
+    scaleAt(12) = qu.penta;
+    NSCALES = 13;
+    idx = int(scale_typ * (NSCALES-1) + 0.5);
+    outs = par(i, NSCALES, Fin : qu.quantize(Bf, scaleAt(i)));
+    fout = outs : ba.selectn(NSCALES, idx);
+};
+
+---
+EFFECTS SNIPPETS
+---
+
+// STEREO DELAY (from Main.dsp Warp)
+aa_stereo_delay(input_l, input_r, duration, feedback, dfactor) = outl, outr
+with{
+    max_del = 15*ma.SR;
+    Dl = duration*ma.SR; Dr = duration*ma.SR*1.5:si.smooth(.9);
+    wow = 1 + os.sinwaveform(600000)*os.sinwaveform(700201):si.smooth(.99);
+    disperse(i) = wa.allpass2(i*100+30*wow*i%2000,1+60*dfactor,0)
+                  : wa.allpass2(i*100-70*wow*i%2000,1+50*dfactor,0);
+    outl = +~(de.delay(max_del, Dl-1) : *(feedback) : fi.lowpass(4,10000)
+             : de.delay(400, 3000*wow) : par(i,16,disperse(i)) : aa.tanh1
+             : fi.highpass(2,100));
+    outr = +~(de.delay(max_del, Dr-1) : *(feedback) : fi.lowpass(4,10000)
+             : de.delay(400, 1500*wow) : par(i,16,disperse(i)) : aa.tanh1
+             : fi.highpass(2,100));
+};
+
+// STEREO FREEVERB
+aa_freeverb(fb1, fb2, damp, spread) = outl, outr
+with{
+    outl, outr = re.stereo_freeverb(fb1, fb2, damp, spread);
+};
+
+// SIMPLE REVERB
+aa_simple_reverb(input, fb, damp) = out
+with{
+    out = re.freeverb(fb, fb*0.8, damp);
+};
+
+// EQ CHANNEL (from Main.dsp)
+aa_eqchl(l, h, lp, hp, blf, blv, d, o) = outl, outr
+with{
+    L = (l-0.5)*12; H = (h-0.5)*12;
+    Lp = 20*2^(10*lp); Hp = 20*2^(10*hp);
+    Blf = 20*2^(10*blf); Blv = (blv-0.5)*6;
+    preamp = hgroup("[0]pre",_,_:(ef.cubicnl_nodc(d,o):fi.dcblocker),(ef.cubicnl_nodc(d,o):fi.dcblocker));
+    shelves = vgroup("[1]shelf",_,_:(fi.low_shelf(L,500):fi.high_shelf(H,1500)),
+                   (fi.low_shelf(L,500):fi.high_shelf(H,1500)));
+    passes = vgroup("[2]passes",_,_:(fi.resonlp(Lp,1,1):fi.resonhp(Hp,1,1)),
+                  (fi.resonlp(Lp,1,1):fi.resonhp(Hp,1,1)));
+    bell = vgroup("bl",_,_:fi.peak_eq(Blv,Blf,200),fi.peak_eq(Blv,Blf,200));
+    strip = preamp:(shelves:passes:bell);
+    outl, outr = strip;
+};
+
+---
+UTILITY SNIPPETS
+---
+
+// ENVELOPES
+
+// AD Envelope
+aa_drum_ad(trig, a, d, ex_f) = out
+with{
+    attack_time = 10 + a*.500*ma.SR; decay_time = d*1.5*ma.SR;
+    trg = trig <: _,_@attack_time : _+_ : _;
+    env_time(counterpos) = ba.if(counterpos, attack_time, decay_time);
+    count = ba.counter(trg) % 2; line = count : ba.line(env_time(count));
+    ex = (ex_f-.5)*10 : round; exf(in) = pow(in, ba.if(ex>1,ex,(-1/ex)));
+    out = line : exf;
+};
+
+// Simple decay
+aa_decay_env(decay, trig) = trig : ba.line((10+50000*decay)*(1-trig));
+
+// ARE envelope
+aa_are_env(a, r, trig) = en.are(a, r, trig);
+
+// ADSR envelope
+aa_adsr_env(a, d, s, r, trig) = en.adsr(a, d, s, r, trig);
+
+---
+// TRIGGER PROCESSING
+
+// Clean trigger
+aa_clean_trig(trig) = trig : ba.impulsify : ba.spulse(10);
+
+// Trigger to gate
+aa_trig_to_gate(trig, hold_ms) = trig : ba.impulsify : de.delay(ma.SR*hold_ms/1000, 1) 
+                                    : ba.line(ma.SR*hold_ms/1000);
+
+---
+// FILTERS
+
+// Low-pass with resonance
+aa_lpf(input, freq, q) = input : fi.lowpass(4, freq, q);
+
+// High-pass
+aa_hpf(input, freq, q) = input : fi.highpass(4, freq, q);
+
+// Resonant low-pass
+aa_resonant_lp(input, freq, bandwidth) = input : fi.resonlp(freq, bandwidth, 1);
+
+---
+// MIXER UTILITIES
+
+// Stereo panner
+aa_panner(input, pan) = (input*cos(pan*ma.PI/2)), (input*sin(pan*ma.PI/2));
+
+// Volume with dB scaling
+aa_volume_db(input, db_gain) = input * pow(10, db_gain/20);
+
+// Dry/Wet mixer
+aa_dry_wet(dry, wet, mix) = dry*(1-mix) + wet*mix;
+
+
+================================================================================
+TESTING CHECKLIST:
+================================================================================
+
+BEFORE STARTING IMPLEMENTATION:
+[ ] Verify Faust environment is properly set up
+[ ] Test that current Main.dsp compiles (even with stub synth_fx)
+[ ] Confirm audio output is working in your DAW/host
+[ ] Test MIDI input/output if applicable
+
+AFTER EACH CHANGE:
+[ ] Code compiles without errors
+[ ] No audio glitches or dropouts
+[ ] CPU usage is reasonable (<50% at 44.1kHz)
+[ ] All existing functionality still works
+[ ] New features behave as expected
+
+SPECIFIC TESTS:
+[ ] Test clock at various BPM (40-200)
+[ ] Test run/stop functionality
+[ ] Test each drum machine individually (mute others)
+[ ] Test trigger timing accuracy
+[ ] Test sequencer step navigation
+[ ] Test parameter ranges (min/max/center)
+[ ] Test mixer routing and levels
+[ ] Test effects (delay, reverb) individually
+[ ] Test stereo imaging
+
+EDGE CASES TO TEST:
+[ ] BPM = 0 (paused)
+[ ] BPM = maximum (1000)
+[ ] All sequencer steps active
+[ ] No sequencer steps active
+[ ] Rapid parameter changes
+[ ] High feedback values on effects
+[ ] Extreme parameter values
+
+================================================================================
+QUICK START - NEXT 5 STEPS:
+================================================================================
+
+If you're ready to start NOW, do these in order:
+
+1. BACKUP YOUR FILE
+   cp Main.dsp Main.dsp.backup
+
+2. TEST CURRENT STATE
+   - Compile and run Main.dsp
+   - Verify drums work (set v1-v4 > 0 to trigger)
+   - Confirm sequencer triggers are firing
+
+3. FIX THE SEQUENCER BUG
+   In nine component, line with step_c:
+   Change: step_c = hgroup("[2]ctl_1",par(i,16,v(i)) : ba.selectn(16,cur_note));
+   To:     step_c = hgroup("[2]ctl_1",par(i,16,c(i)) : ba.selectn(16,cur_note));
+   (Use c(i) instead of v(i) for control lane)
+
+4. IMPLEMENT BASIC synth_fx (30 minutes)
+   Replace current stub with:
+   
+   synth_fx(f1,v1,c1,f2,v2,c2,f3,v3,c3,f4,v4,c4,tphz) = out
+   with {
+       // Combine triggers from all 4 lanes
+       trig1 = v1>0 : ba.impulsify;
+       trig2 = v2>0 : ba.impulsify;
+       trig3 = v3>0 : ba.impulsify;
+       trig4 = v4>0 : ba.impulsify;
+       main_trig = (trig1 + trig2 + trig3 + trig4) : ba.impulsify;
+       
+       // Use frequency from lane 1 (or combine all)
+       note = 60 + (f1 * 48); // 0-1 -> 60-108 (C4-C7)
+       freq = 440.0 * ma.pow(2.0, (note-69.0)/12.0);
+       
+       // Simple subtractive synth
+       saw = os.saw(freq);
+       square = os.square(freq*1.5);
+       osc = saw + square*0.3;
+       
+       // Envelope
+       env = en.adsr(0.001, 0.1, 0.3, 0.1, main_trig);
+       
+       // Filter with control from c1
+       cutoff = 200 + c1 * 10000;
+       filtered = osc : fi.lowpass(cutoff, 0.5);
+       
+       // Apply velocity and envelope
+       out = filtered * env * v1 * 0.5, filtered * env * v1 * 0.5;
+   };
+
+5. TEST THE FIXES
+   - Verify synth_fx now produces sound
+   - Check that it responds to sequencer triggers
+   - Test different notes via f1 parameter
+   - Verify filter cutoff changes with c1
+
+================================================================================
+RESOURCES & REFERENCES:
+================================================================================
+
+Faust Documentation:
+- https://faust.grame.fr/doc/manual/index.html
+- https://faust.grame.fr/doc/libraries/index.html
+
+Elektron Workflow Inspiration:
+- Parameter locks: Each step can have unique parameter values
+- Pattern chaining: Link patterns together for longer sequences
+- Performance macros: Single control affects multiple parameters
+- Conditional triggers: Probability, repeats, ratcheting
+
+Numogram Resources:
+- Gurdjieff Enneagram: Study the relationships between numbers
+- Harmonic series: Use numogram ratios for musical intervals
+- Geometric patterns: Visual representation of step relationships
+
+Faust Tips:
+- Use par(i, N, expr) for parallel loops
+- Use seq(i, N, expr) for sequential operations
+- Use ba.if(cond, then, else) for conditional logic
+- Use si.smoo for smoothing parameters
+- Use ma.SR for sample rate dependent calculations
+- Use de.delay for sample-accurate delays
+- Use aa.tanh1 for soft clipping
+
+================================================================================
+NOTES:
+================================================================================
+
+1. The current sequencer (nine) uses par(i,16,...) which is good for CPU
+   efficiency. The duplication mentioned in original todo has been fixed.
+
+2. The delay in component one (Warp) has max_del = 15*ma.SR. At 44.1kHz, this
+   is ~650ms. Sufficient for most musical delays.
+
+3. The tanh clipping in eight component (drums) is good for preventing digital
+   distortion. Apply aa.tanh1 in synth_fx as well.
+
+4. Consider adding a master volume control. Currently there isn't one,
+   making it hard to control overall output level.
+
+5. The mixer (one) has 6 channels but only 4 sources are connected.
+   Room for expansion: add sampler, add more synths.
+
+6. The numogram visualization in main.lua maps positions as:
+   {3,6,2,7,5,4,1,8,9,0}
+   This can be used to drive UI and parameter mappings.
+
+7. Current Main.dsp architecture:
+   - Plex (zero + nine) = Clock + Sequencer
+   - Timecircuit (eight + 3x synth_fx) = Drums + 3 Synths
+   - Warp (one) = Mixer + Effects
+
+8. BUG FOUND: In nine component, line ~55, step_c uses v(i) instead of c(i)
+   This means the control lane is using velocity values instead of control values.
+
+9. The process chain is: Plex <: Timecircuit : Warp
+   This means Plex outputs go to Timecircuit, then to Warp.
+   Timecircuit receives (f1,v1,c1,f2,v2,c2,f3,v3,c3,f4,v4,c4,tphz) from Plex.
+
+================================================================================
+TRACKING YOUR PROGRESS:
+================================================================================
+
+Use this format to track completion:
+
+[X] = Complete and tested
+[ ] = Not started
+[~] = Started but not complete
+[!] = Complete but untested
+[*] = Complete, tested, needs refinement
+
+Current Status (as of July 28, 2026):
+[~] 1. Implement synth_fx (stub exists, needs implementation)
+[ok] 2. Test current drum sounds
+[ok] 3. Verify sequencer timing
+[ ] 4. Fix sequencer bug (c(i) vs v(i))
+[ ] 5. Add sampler
+[ ] 6. Implement parameter locks
+[ ] 7. Pattern chaining
+[ ] 8. Deep numogram integration
+[ ] 9. Microtiming
+[ ] 10. Conditional triggers
+[ ] 11. Parameter automation
+[ ] 12. Refactor sequencer code
+[ ] 13. Optimize CPU usage
+[ ] 14. Add proper UI grouping
+[ ] 15. Preset management
+[ ] 16. MIDI control
+[ ] 17. Audio input processing
+
+Last Updated: July 28, 2026
+Current Focus: Analyzing Main.dsp and organizing documentation
+Next Priority: Implement synth_fx, fix sequencer bug
+
+================================================================================
+FILE LOCATIONS:
+================================================================================
+
+Main Faust File: /home/IR/Documents/DSP_Dev/dsp_code/Lua/Dæw/Numogram/Main.dsp
+Lua Interface: /home/IR/Documents/DSP_Dev/dsp_code/Lua/Dæw/main.lua
+Backup Todo: /home/IR/Documents/DSP_Dev/dsp_code/Lua/Dæw/Numogram/slop°IMPLEMENTATION_TODO.txt.backup
+
+Faust Snippets Library:
+- /home/IR/Documents/DSP_Dev/dsp_code/Faust /2> Gen/drums/ (Khique.dsp, Hat.dsp, Snare.dsp, Additive.dsp)
+- /home/IR/Documents/DSP_Dev/dsp_code/Faust /2> Gen/ (Karplus_strong.dsp, Granular.dsp, Comb.dsp, Resonator.dsp)
+- /home/IR/Documents/DSP_Dev/dsp_code/Faust /1> Modulate/ (16_step_trig_sequencer.dsp, AD_envelope.dsp, etc.)
+- /home/IR/Documents/DSP_Dev/dsp_code/Faust /3> Process/ (Tape.dsp, Granular.dsp, Doubler.dsp, etc.)
+
+Components in Main.dsp:
+- Plex (zero + nine): Lines 7-135
+- Timecircuit (eight + 3x synth_fx): Lines 137-248
+- Warp (one): Lines 250-500+
+
+Specific Lines:
+- Plex definition: Line 1
+- zero (Clock): Lines 7-28
+- nine (Sequencer): Lines 30-135
+- Timecircuit: Line 3
+- eight (Drums): Lines 137-240
+- synth_fx (STUB): Lines 242-248
+- Warp/one (Mixer): Lines 250+

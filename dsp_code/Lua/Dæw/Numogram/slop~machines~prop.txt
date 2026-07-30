@@ -1,0 +1,2018 @@
+================================================================================
+SLOP° MACHINES PROPOSAL - Numogram Groovebox Machine Integration
+================================================================================
+DATE: July 28, 2026
+SOURCE: research.txt DSP Market Analysis
+TARGET: Main.dsp Faust Integration
+
+================================================================================
+OVERVIEW
+================================================================================
+
+This document proposes specific ways to integrate machine models from the
+research.txt file into your Main.dsp numogram-based groovebox.
+
+Your current architecture:
+  process = Plex <: Timecircuit : Warp;
+  
+  Plex (zero + nine): Clock + 16-step sequencer with numogram mapping
+  Timecircuit (eight + 3x synth_fx): Drums + 3 Synth stubs
+  Warp (one): 6-channel mixer with delay, reverb, EQ
+
+Integration Strategy:
+  1. ENHANCE eight (Drums): Add machine-selectable drum synths
+  2. IMPLEMENT synth_fx: Add 3 different synth engines per instance
+  3. ADD seven (Sampler): Basic sampler + granular options
+  4. EXPAND Warp: Add more effect types from Tonverk
+  5. CREATE Modulation: Add LFO/Envelope systems
+
+Numogram Mapping (proposed): NO
+  0 = Clock/Master (Plex/zero)
+  1 = Synth Machine 1 (synth_fx)
+  2 = Synth Machine 2 (synth_fx)
+  3 = Synth Machine 3 (synth_fx)
+  4 = Sampler (seven - NEW)
+  5 = Drum Machine 1 (eight - khique)
+  6 = Drum Machine 2 (eight - snr)
+  7 = Drum Machine 3 (eight - Hate)
+  8 = Drum Machine 4 (eight - additive)
+  9 = Effects Bus (Warp)
+
+================================================================================
+PART 1: DRUM MACHINE ENHANCEMENTS (Component eight)
+================================================================================
+
+Current eight has 4 drum machines: khique, snr, Hate, additive.
+Proposal: Replace with machine-selectable system with these models:
+
+---
+OPTION A: Machinedrum Engine Selector
+---
+
+Machinedrum has 20+ engines. Best candidates for Faust:
+
+1. TRX 808 (Bass Drum, Snare, etc.)
+2. TRX 909 (Classic drum machine)
+3. EFM (FM percussion - 2-op FM + noise)
+4. E-DRUM (Physical modeling percussion)
+5. SIDSID (C64 SID chip emulation)
+6. GnR (Granular from sample buffer)
+7. NOISE (Colored noise generator)
+8. GND (Ground synthesis - sine to noise morphing)
+
+Implementation:
+
+drum_machine(trig, machine_type, p1, p2, p3, p4) = out
+with{
+    // Machine selector
+    machine = ba.selectn(8, machine_type);
+    
+    // TRX 808 Bass Drum
+    trx808_kick(trig) = out
+    with{
+        pitchEnv = en.are(0.001, 0.2, trig);
+        ampEnv = en.are(0.001, 0.4, trig);
+        baseFreq = 50 * pitchEnv;
+        click = no.noise * en.are(0.001, 0.05, trig);
+        tone = os.oscsin(baseFreq) * pitchEnv;
+        out = (tone + click * 0.3) * ampEnv : fi.lowpass(4000, 0.5);
+    };
+    
+    // TRX 909 Bass Drum
+    trx909_kick(trig) = out
+    with{
+        pitchEnv = en.are(0.001, 0.3, trig);
+        ampEnv = en.are(0.001, 0.3, trig);
+        baseFreq = 60 * pitchEnv;
+        tone = os.oscsin(baseFreq) + os.oscsin(baseFreq*2)*0.5;
+        click = os.pulse(baseFreq*8, 0.2) * en.are(0.001, 0.02, trig);
+        out = ((tone + click) * ampEnv) : fi.lowpass(3000, 0.3);
+    };
+    
+    // EFM (FM Percussion)
+    efm_drum(trig, ratio, feedback) = out
+    with{
+        modFreq = 440 * ratio;
+        carrierFreq = 440;
+        mod = os.oscsin(modFreq) * en.are(0.01, 0.5, trig);
+        carrier = os.oscsin(carrierFreq + mod * feedback * 10);
+        noise = no.noise * en.are(0.001, 0.1, trig);
+        out = (carrier + noise * 0.2) : fi.lowpass(5000, 0.5);
+    };
+    
+    // E-DRUM (Physical Modeling)
+    e_drum(trig, freq, decay) = out
+    with{
+        // Simple modal synthesis with 2 modes
+        mode1 = os.oscsin(freq * 2.5) * en.are(0.001, decay, trig);
+        mode2 = os.oscsin(freq * 3.2) * en.are(0.001, decay*0.8, trig);
+        noise = no.noise * en.are(0.001, decay*0.5, trig);
+        out = (mode1 + mode2 + noise) * 0.5 : fi.lowpass(6000, 0.3);
+    };
+    
+    // SIDSID (C64 Emulation)
+    sid_drum(trig, freq, pulseWidth) = out
+    with{
+        saw = os.saw(freq);
+        square = os.pulse(freq, pulseWidth);
+        triangle = os.tri(freq);
+        noise = no.noise;
+        mixed = (saw + square + triangle) * 0.5 + noise * 0.2;
+        out = mixed * en.are(0.001, 0.3, trig) : fi.lowpass(3000, 0.4);
+    };
+    
+    // GnR Granular (simplified)
+    gnr_drum(trig) = out
+    with{
+        // Simple granular with short grain
+        grainSize = 50; // samples
+        buffer = no.noise : rwtable(1000, writeIdx);
+        readPos = (writeIdx - grainSize) % 1000;
+        grain = rdtable(buffer, readPos) * en.hann_window(grainSize);
+        out = grain * en.are(0.001, 0.2, trig);
+        writeIdx = writeIdx + 1;
+    };
+    
+    // NOISE
+    noise_drum(trig, color) = out
+    with{
+        white = no.noise;
+        pink = no.pink_noise;
+        filtered = ba.lininterp(color, white, pink);
+        out = filtered * en.are(0.001, 0.1, trig) : fi.highpass(4, 200 + color*10000);
+    };
+    
+    // GND (Ground - waveform morphing)
+    gnd_drum(trig, shape) = out
+    with{
+        sine = os.oscsin(200);
+        triangle = os.tri(200);
+        saw = os.saw(200);
+        square = os.square(200);
+        noise = no.noise;
+        // Morph through waveforms
+        a = ba.lininterp(shape, sine, triangle);
+        b = ba.lininterp(shape, saw, square);
+        mixed = ba.lininterp(shape*2, a, b);
+        out = mixed * en.are(0.001, 0.2, trig);
+    };
+    
+    // Select based on machine type
+    out = machine <: trx808_kick, trx909_kick, efm_drum, e_drum, sid_drum, gnr_drum, noise_drum, gnd_drum;
+};
+
+Usage in eight component:
+Replace the individual drum functions with:
+
+    i1 = drum_machine(t1, 0, ...);  // TRX 808
+    i2 = drum_machine(t2, 1, ...);  // TRX 909
+    i3 = drum_machine(t3, 4, ...);  // SIDSID
+    i4 = drum_machine(t4, 2, ...);  // EFM
+
+---
+OPTION B: Analog Rytm Analog Engine
+---
+
+Analog Rytm has dual VCO + noise + analog filter + overdrive.
+
+analog_drum(trig, vco1_shape, vco2_shape, vco2_detune, noise_mix) = out
+with{
+    baseFreq = 100;
+    
+    // VCO 1
+    vco1_saw = os.saw(baseFreq);
+    vco1_tri = os.tri(baseFreq);
+    vco1_sqr = os.square(baseFreq);
+    vco1_pulse = os.pulse(baseFreq, 0.3);
+    vco1 = ba.select4(vco1_shape, vco1_saw, vco1_tri, vco1_sqr, vco1_pulse);
+    
+    // VCO 2 with detune
+    vco2_freq = baseFreq * (1 + vco2_detune*0.1);
+    vco2 = ba.select4(vco2_shape, os.saw(vco2_freq), os.tri(vco2_freq), 
+                      os.square(vco2_freq), os.pulse(vco2_freq, 0.3));
+    
+    // Noise
+    noise = no.noise;
+    
+    // Mix VCOs
+    vcos = (vco1 + vco2 * 0.7) * 0.7;
+    
+    // Add noise
+    mixed = vcos + noise * noise_mix * 0.5;
+    
+    // Analog-style filter
+    cutoff = 2000 + 3000 * en.are(0.001, 0.3, trig);
+    filtered = mixed : fi.lowpass(4, cutoff, 0.7);
+    
+    // Analog overdrive
+    driven = filtered * 2 : ef.cubicnl(0.5, 0);
+    
+    // Amplitude envelope
+    ampEnv = en.are(0.001, 0.3, trig);
+    out = driven * ampEnv * 0.5;
+};
+
+---
+OPTION C: OP-1 DS-1 Drum Synth
+---
+
+The OP-1 DS-1 engine has specialized drum synths:
+
+op1_drum(trig, drum_type, p1, p2) = out
+with{
+    // Kick
+    ds1_kick(trig) = out
+    with{
+        pitchEnv = en.are(0.001, 0.4, trig);
+        ampEnv = en.are(0.001, 0.5, trig);
+        freq = 80 * (1 + pitchEnv * 2);
+        tone = os.saw(freq) * 0.7 + os.oscsin(freq*2) * 0.3;
+        click = no.noise * en.are(0.001, 0.02, trig);
+        out = (tone + click) * ampEnv : fi.lowpass(3000, 0.4);
+    };
+    
+    // Snare
+    ds1_snare(trig) = out
+    with{
+        toneEnv = en.are(0.001, 0.2, trig);
+        noiseEnv = en.are(0.001, 0.1, trig);
+        tone = os.oscsin(200 * (1 + toneEnv)) * toneEnv;
+        noise = no.noise * noiseEnv;
+        out = (tone * 0.5 + noise * 0.5) : fi.highpass(4, 500) : fi.lowpass(4, 4000);
+    };
+    
+    // Hi-Hat
+    ds1_hat(trig) = out
+    with{
+        env = en.are(0.001, 0.05, trig);
+        noise = no.noise;
+        filtered = noise : fi.bandpass(4, 8000, 0.5);
+        out = filtered * env * 0.7;
+    };
+    
+    // Tom
+    ds1_tom(trig, pitch) = out
+    with{
+        freq = 100 * pow(2, pitch);
+        env = en.are(0.001, 0.4, trig);
+        tone = os.saw(freq) * 0.6 + os.oscsin(freq*1.5) * 0.4;
+        out = tone * env : fi.lowpass(4, 2000, 0.3);
+    };
+    
+    out = ba.select4(drum_type, ds1_kick, ds1_snare, ds1_hat, ds1_tom);
+};
+
+================================================================================
+PART 2: SYNTH MACHINE MODELS (Component synth_fx)
+================================================================================
+
+Current synth_fx is a stub returning zeros. Propose 3 different synth engines
+per instance, selectable via numogram position.
+
+---
+SYNTH ENGINE 1: Digitone FM (4-operator)
+---
+
+The Elektron Digitone has 8 FM algorithms with 4 operators.
+
+fm_synth(trig, note, vel, op_config) = outl, outr
+with{
+    // Convert note to frequency
+    freq = 440 * ma.pow(2, (note-69)/12);
+    
+    // Operator configurations (simplified 2-op for CPU)
+    // op_config: 0=carrier only, 1=mod->carrier, 2=feedback FM
+    
+    carrierFreq = freq;
+    modFreq = freq * 1.5;
+    
+    // Operators with envelopes
+    op1_env = en.adsr(0.001, 0.1, 0.5, 0.1, trig);
+    op2_env = en.adsr(0.001, 0.2, 0.3, 0.2, trig);
+    
+    carrier = os.oscsin(carrierFreq) * op1_env;
+    
+    // Modulation based on config
+    mod_index = vel * 5;
+    
+    if (op_config == 0) {
+        // Simple carrier
+        out = carrier, carrier;
+    } else if (op_config == 1) {
+        // Modulator -> Carrier
+        modulator = os.oscsin(modFreq) * op2_env;
+        out = os.oscsin(carrierFreq + modulator * mod_index), 
+             os.oscsin(carrierFreq + modulator * mod_index);
+    } else {
+        // Feedback FM
+        feedback = carrier * 0.5;
+        out = os.oscsin(carrierFreq + feedback * mod_index), 
+             os.oscsin(carrierFreq + feedback * mod_index);
+    }
+    
+    out = out * vel * 0.3 : fi.lowpass(4, 5000, 0.3);
+};
+
+Usage in synth_fx:
+
+    synth_fx(f1,v1,c1,f2,v2,c2,f3,v3,c3,f4,v4,c4,tphz) = out
+    with{
+        // Combine triggers
+        trig = (v1>0 | v2>0 | v3>0 | v4>0) : ba.impulsify;
+        
+        // Use f1 for note, c1 for synth engine selection
+        note = 60 + f1 * 48;  // 0-1 -> 60-108
+        engine = int(c1 * 3); // 0, 1, or 2
+        
+        // Call appropriate engine
+        out = fm_synth(trig, note, v1, engine);
+    };
+
+---
+SYNTH ENGINE 2: Analog Four VA (Virtual Analog)
+---
+
+analog_four_synth(trig, note, vel, wave_shape) = outl, outr
+with{
+    freq = 440 * ma.pow(2, (note-69)/12);
+    
+    // Waveform selection
+    saw = os.saw(freq);
+    pulse = os.pulse(freq, 0.3);
+    triangle = os.tri(freq);
+    sine = os.oscsin(freq);
+    
+    // Morph between waveforms
+    shape = wave_shape * 3;
+    w1 = ba.lininterp(ba.min(shape, 1), sine, triangle);
+    w2 = ba.lininterp(ba.max(shape-1, 0), triangle, saw);
+    waveform = ba.lininterp(ba.max(shape-2, 0), w1, w2);
+    
+    // Sub oscillator
+    sub = os.oscsin(freq/2) * 0.3;
+    
+    // Mix with noise for sparkle
+    noise = no.noise * 0.05;
+    
+    raw = (waveform + sub + noise) * 0.8;
+    
+    // Analog filter emulation (24dB ladder)
+    cutoff = 200 + note * 20;  // Track keyboard
+    resonance = 0.5;
+    filtered = raw : fi.lowpass(4, cutoff, resonance);
+    
+    // Overdrive
+    driven = filtered * 2 : ef.cubicnl(0.3, 0);
+    
+    // Envelope
+    env = en.adsr(0.001, 0.2, 0.5, 0.1, trig);
+    
+    out = driven * env * vel * 0.5, driven * env * vel * 0.5;
+};
+
+---
+SYNTH ENGINE 3: Monomachine Engine Selector
+---
+
+Monomachine has 6 engines. Best for Faust:
+
+monomachine_synth(trig, note, vel, engine_type, p1, p2) = outl, outr
+with{
+    freq = 440 * ma.pow(2, (note-69)/12);
+    
+    // SID Engine (C64 emulation)
+    sid_engine(trig, freq, pulseWidth) = out
+    with{
+        vco1 = os.saw(freq);
+        vco2 = os.pulse(freq*1.5, pulseWidth);
+        vco3 = os.tri(freq*0.5);
+        noise = no.noise * 0.3;
+        mixed = (vco1 + vco2 + vco3 + noise) * 0.5;
+        env = en.adsr(0.001, 0.1, 0.3, 0.1, trig);
+        out = mixed * env : fi.lowpass(4, 3000, 0.4);
+    };
+    
+    // FM+ Engine (Modular FM)
+    fmplus_engine(trig, freq, ratio) = out
+    with{
+        mod1 = os.oscsin(freq * ratio);
+        mod2 = os.oscsin(freq * ratio * 1.5);
+        carrier = os.oscsin(freq + mod1 * 5 + mod2 * 3);
+        env = en.adsr(0.001, 0.2, 0.4, 0.1, trig);
+        out = carrier * env : fi.lowpass(4, 4000, 0.3);
+    };
+    
+    // VAP Engine (Virtual Analog)
+    vap_engine(trig, freq, cutoff) = out
+    with{
+        saw = os.saw(freq);
+        pulse = os.pulse(freq, 0.4);
+        waveform = (saw + pulse) * 0.5;
+        env = en.adsr(0.001, 0.1, 0.5, 0.1, trig);
+        filtered = waveform * env : fi.lowpass(4, cutoff, 0.6);
+        driven = filtered * 1.5 : ef.cubicnl(0.4, 0);
+        out = driven;
+    };
+    
+    // WOOF Engine (Bass specialized)
+    woof_engine(trig, freq) = out
+    with{
+        saw = os.saw(freq);
+        square = os.square(freq);
+        waveform = (saw + square * 0.5) * 0.8;
+        env = en.adsr(0.001, 0.05, 0.7, 0.1, trig);
+        cutoff = 200 + freq * 0.1;
+        out = waveform * env : fi.lowpass(4, cutoff, 0.5);
+    };
+    
+    // Select engine
+    out = ba.select4(engine_type, 
+        sid_engine(trig, freq, p1), 
+        fmplus_engine(trig, freq, p1), 
+        vap_engine(trig, freq, p1*5000), 
+        woof_engine(trig, freq));
+    
+    out = out * vel * 0.4, out * vel * 0.4;
+};
+
+---
+SYNTH ENGINE 4: Yamaha SY Series (Vector + FM)
+---
+
+SY series has unique features: RCM (Convolution Modulation), Vector Synthesis.
+
+// SY77/99 AFM + RCM (Advanced FM with Convolution)
+sy_fm_rcm(trig, note, vel, conv_amount) = outl, outr
+with{
+    freq = 440 * ma.pow(2, (note-69)/12);
+    
+    // 2-op FM base
+    mod = os.oscsin(freq * 1.5) * en.adsr(0.01, 0.2, 0.3, 0.1, trig);
+    carrier = os.oscsin(freq + mod * 5) * en.adsr(0.001, 0.3, 0.5, 0.1, trig);
+    
+    // RCM - Convolution modulation (simplified with waveshaping)
+    // In real SY, this uses actual convolution with spectrum tables
+    // Simplified: use waveshaping as approximation
+    convolved = carrier * (1 + carrier * conv_amount * 2) / (1 + carrier * conv_amount * 2);
+    
+    out = convolved * vel * 0.4, convolved * vel * 0.4;
+    out = out : fi.lowpass(4, 4000, 0.3);
+};
+
+// SY22/35 Vector Synthesis
+sy_vector(trig, note, vel, x_pos, y_pos) = outl, outr
+with{
+    freq = 440 * ma.pow(2, (note-69)/12);
+    
+    // 4 sources as per SY22
+    // Source A: Sine
+    srcA = os.oscsin(freq);
+    // Source B: Saw
+    srcB = os.saw(freq);
+    // Source C: Square
+    srcC = os.square(freq);
+    // Source D: Noise
+    srcD = no.noise;
+    
+    // Vector joystick crossfade
+    // X and Y are 0-1
+    // W1 = (1-X)*(1-Y)  top-left
+    // W2 = X*(1-Y)      top-right
+    // W3 = (1-X)*Y      bottom-left
+    // W4 = X*Y          bottom-right
+    
+    W1 = (1-x_pos) * (1-y_pos);
+    W2 = x_pos * (1-y_pos);
+    W3 = (1-x_pos) * y_pos;
+    W4 = x_pos * y_pos;
+    
+    mixed = srcA*W1 + srcB*W2 + srcC*W3 + srcD*W4;
+    
+    env = en.adsr(0.001, 0.2, 0.5, 0.1, trig);
+    
+    out = mixed * env * vel * 0.5, mixed * env * vel * 0.5;
+    out = out : fi.lowpass(4, 3000, 0.3);
+};
+
+---
+SYNTH ENGINE 5: OP-1 Engine Selector
+---
+
+The OP-1 has 8 synth engines:
+
+op1_synth(trig, note, vel, engine_type, p1, p2) = outl, outr
+with{
+    freq = 440 * ma.pow(2, (note-69)/12);
+    
+    // FM Engine
+    fm_engine(trig, freq, ratio) = out
+    with{
+        mod = os.oscsin(freq * ratio);
+        carrier = os.oscsin(freq + mod * 5);
+        env = en.adsr(0.01, 0.2, 0.3, 0.1, trig);
+        out = carrier * env;
+    };
+    
+    // Digital Engine (sync sweep)
+    digital_engine(trig, freq, sync_rate) = out
+    with{
+        sync_osc = os.saw(freq) : ba.spulse(int(ma.SR/freq/sync_rate)) : ba.impulsify;
+        saw = os.saw(freq);
+        out = (saw + sync_osc * 0.5) * en.adsr(0.001, 0.3, 0.5, 0.1, trig);
+    };
+    
+    // String Engine (Karplus-Strong)
+    string_engine(trig, freq) = out
+    with{
+        maxDel = int(ma.SR / 50); // 50Hz min
+        delLength = int(ma.SR / freq);
+        filter = _ <: _,_' :> /(2);
+        string = +~(de.fdelay4(maxDel, delLength-1) : filter : *(0.95));
+        impulse = trig : ba.impulsify;
+        out = string * impulse * 2;
+    };
+    
+    // Pulse Engine
+    pulse_engine(trig, freq, width) = out
+    with{
+        pulse = os.pulse(freq, width);
+        sub = os.oscsin(freq/2) * 0.3;
+        out = (pulse + sub) * en.adsr(0.001, 0.1, 0.5, 0.1, trig);
+    };
+    
+    // Cluster Engine (7 detuned oscillators)
+    cluster_engine(trig, freq, spread) = out
+    with{
+        osc(i) = os.saw(freq * (1 + spread * (i/7 - 0.5))) * 0.2;
+        cluster = par(i, 7, osc(i)) : sum;
+        env = en.adsr(0.001, 0.2, 0.5, 0.1, trig);
+        out = cluster * env;
+    };
+    
+    // Dr Wave (Wavetable)
+    drwave_engine(trig, freq, table_idx) = out
+    with{
+        // Create a simple wavetable with 4 waves
+        wavetable = par(i, 1024, 
+            select4(table_idx, 
+                sin(2*ma.PI*i/1024), 
+                2*(i/1024-0.5), 
+                (i/1024 < 0.5 ? -1 : 1), 
+                (i/1024*2-1)));
+        
+        phase = os.osc_phasor(freq, 0);
+        readPos = phase * 1024;
+        wt_osc = rdtable(wavetable, int(readPos)) * 2 - 1;
+        env = en.adsr(0.001, 0.1, 0.5, 0.1, trig);
+        out = wt_osc * env;
+    };
+    
+    // Nitro Engine (Distortion-based)
+    nitro_engine(trig, freq, drive) = out
+    with{
+        saw = os.saw(freq);
+        distorted = saw * drive : ef.cubicnl(1.0, 0);
+        // Feedback waveshaping
+        feedback = distorted * 0.5;
+        final = (saw + feedback) * 0.5 : ef.cubicnl(drive, 0);
+        env = en.adsr(0.001, 0.1, 0.5, 0.1, trig);
+        out = final * env;
+    };
+    
+    // DS-1 Drum (as synth)
+    ds1_engine(trig, freq) = out
+    with{
+        tone = os.saw(freq) + os.oscsin(freq*2);
+        click = no.noise * en.are(0.001, 0.02, trig);
+        env = en.adsr(0.001, 0.3, 0.5, 0.1, trig);
+        out = (tone + click) * env : fi.lowpass(4, 3000, 0.4);
+    };
+    
+    // Select engine (0-7)
+    out = ba.select8(engine_type,
+        fm_engine(trig, freq, p1), 
+        digital_engine(trig, freq, p1),
+        string_engine(trig, freq),
+        pulse_engine(trig, freq, p1),
+        cluster_engine(trig, freq, p1),
+        drwave_engine(trig, freq, int(p1*4)),
+        nitro_engine(trig, freq, p1),
+        ds1_engine(trig, freq));
+    
+    out = out * vel * 0.4, out * vel * 0.4;
+};
+
+---
+SYNTH ENGINE 6: OP-Z Engine Selector
+---
+
+OP-Z has specialized engines for a groovebox:
+
+opz_synth(trig, note, vel, engine_type) = outl, outr
+with{
+    freq = 440 * ma.pow(2, (note-69)/12);
+    
+    // PULSE Engine
+    pulse_engine(trig, freq, width) = out
+    with{
+        pulse = os.pulse(freq, width);
+        sub = os.oscsin(freq/2) * 0.3;
+        env = en.adsr(0.001, 0.1, 0.5, 0.1, trig);
+        out = (pulse + sub) * env : fi.lowpass(4, 2000, 0.3);
+    };
+    
+    // WAVE Engine (Wavetable)
+    wave_engine(trig, freq, wave_idx) = out
+    with{
+        waves = par(i, 5, 
+            select5(wave_idx,
+                os.oscsin(freq), 
+                os.saw(freq),
+                os.tri(freq),
+                os.square(freq),
+                no.noise));
+        out = waves * en.adsr(0.001, 0.1, 0.5, 0.1, trig);
+    };
+    
+    // FM Engine
+    fm_engine(trig, freq, ratio) = out
+    with{
+        mod = os.oscsin(freq * ratio);
+        carrier = os.oscsin(freq + mod * 5);
+        env = en.adsr(0.01, 0.2, 0.3, 0.1, trig);
+        out = carrier * env : fi.lowpass(4, 3000, 0.3);
+    };
+    
+    // KICK Engine
+    kick_engine(trig, freq) = out
+    with{
+        pitchEnv = en.are(0.001, 0.4, trig);
+        ampEnv = en.are(0.001, 0.5, trig);
+        tone = os.saw(freq * (1 + pitchEnv * 2)) * 0.7;
+        click = no.noise * en.are(0.001, 0.02, trig);
+        out = (tone + click) * ampEnv : fi.lowpass(4, 2000, 0.4);
+    };
+    
+    // SNARE Engine
+    snare_engine(trig, freq) = out
+    with{
+        toneEnv = en.are(0.001, 0.2, trig);
+        noiseEnv = en.are(0.001, 0.1, trig);
+        tone = os.oscsin(freq * (1 + toneEnv)) * toneEnv;
+        noise = no.noise * noiseEnv;
+        out = (tone * 0.5 + noise * 0.5) : fi.highpass(4, 500) : fi.lowpass(4, 4000);
+    };
+    
+    // HI-HAT Engine
+    hat_engine(trig, freq) = out
+    with{
+        env = en.are(0.001, 0.05, trig);
+        noise = no.noise;
+        filtered = noise : fi.bandpass(4, freq, 0.5);
+        out = filtered * env * 0.7;
+    };
+    
+    // BASS Engine
+    bass_engine(trig, freq) = out
+    with{
+        saw = os.saw(freq);
+        square = os.square(freq);
+        waveform = (saw + square * 0.5) * 0.8;
+        env = en.adsr(0.001, 0.05, 0.7, 0.1, trig);
+        cutoff = 200 + freq * 0.1;
+        out = waveform * env : fi.lowpass(4, cutoff, 0.5);
+    };
+    
+    // LEAD Engine
+    lead_engine(trig, freq) = out
+    with{
+        saw = os.saw(freq);
+        pulse = os.pulse(freq, 0.4);
+        waveform = (saw + pulse) * 0.5;
+        env = en.adsr(0.01, 0.1, 0.5, 0.1, trig);
+        out = waveform * env : fi.lowpass(4, 4000, 0.3);
+    };
+    
+    // CHORD Engine (3 notes)
+    chord_engine(trig, freq) = out
+    with{
+        root = os.saw(freq);
+        third = os.saw(freq * 1.25);  // Major third
+        fifth = os.saw(freq * 1.5);   // Perfect fifth
+        chord = (root + third + fifth) * 0.4;
+        env = en.adsr(0.001, 0.2, 0.5, 0.1, trig);
+        out = chord * env : fi.lowpass(4, 3000, 0.3);
+    };
+    
+    // Select engine (0-9)
+    out = ba.select10(engine_type,
+        pulse_engine(trig, freq, 0.3),
+        wave_engine(trig, freq, 0),
+        fm_engine(trig, freq, 1.5),
+        kick_engine(trig, freq),
+        snare_engine(trig, freq),
+        hat_engine(trig, freq*2),
+        bass_engine(trig, freq),
+        lead_engine(trig, freq),
+        chord_engine(trig, freq),
+        pulse_engine(trig, freq, 0.5));
+    
+    out = out * vel * 0.4, out * vel * 0.4;
+};
+
+---
+SYNTH ENGINE RECOMMENDATION:
+---
+
+For your numogram groovebox, I recommend implementing:
+
+1. **synth_fx instance 1**: OP-Z Engine Selector (most groovebox-appropriate)
+   - Engines: Kick, Snare, Bass, Lead, Chord, FM, Pulse, Wave
+   - Perfect for sequencer-driven patterns
+
+2. **synth_fx instance 2**: Monomachine Engine Selector
+   - Engines: SID, FM+, VAP, WOOF
+   - Great for leads and basses
+
+3. **synth_fx instance 3**: OP-1 Engine Selector
+   - Engines: FM, Digital, String, Cluster, Dr Wave
+   - Unique character engines
+
+This gives you 22 different synth engines to work with!
+
+================================================================================
+PART 3: SAMPLER IMPLEMENTATION (Component seven)
+================================================================================
+
+Add a new component for sampling functionality.
+
+---
+OPTION A: Basic Sampler
+---
+
+seven(trig, pitch, start, length, env_params) = out
+with{
+    // Parameters
+    basePitch = 440.0;
+    sampleRate = ma.SR;
+    
+    // Playback position
+    phase = os.osc_phasor(1.0, 0, trig);
+    
+    // Calculate playback rate based on pitch
+    // pitch: 0-1 mapped to -24 to +24 semitones
+    semitones = (pitch - 0.5) * 48;  // -24 to +24
+    playbackRate = pow(2, semitones/12);
+    
+    // Sample position (0-1)
+    pos = phase * playbackRate * length + start;
+    
+    // Sample buffer (replace with actual sample loading)
+    // For now, use noise as placeholder
+    sampleBuffer = no.noise;
+    
+    // Read from buffer
+    sample = rdtable(sampleBuffer, int(pos * bufferSize));
+    
+    // Envelope
+    env = en.adsr(0.001, 0.1, 0.5, 0.1, trig);
+    
+    out = sample * env * 0.5, sample * env * 0.5;
+};
+
+---
+OPTION B: Granular Sampler (Morphagene-inspired)
+---
+
+Based on Make Noise Morphagene:
+
+granular_sampler(trig, pos, gene_size, organize, morph, varispeed, smooth) = out
+with{
+    // Buffer size
+    bufferSize = 44100; // 1 second at 44.1kHz
+    
+    // Write position (for recording - future)
+    writePos = 0;
+    
+    // Grain envelope windows
+    hann_window(i, size) = 0.5 * (1 - cos(2*ma.PI*i/size));
+    bartlett_window(i, size) = 2*i/size < 1 ? 2*i/size : 2 - 2*i/size;
+    trapezoid_window(i, size) = 1.0; // Simplified
+    
+    // Select window based on organize
+    window(i, size) = 
+        organize < 0.33 ? hann_window(i, size) :
+        (organize < 0.66 ? bartlett_window(i, size) : trapezoid_window(i, size));
+    
+    // Grain size in samples
+    grainSamples = int(gene_size * 1000 + 10); // 10-1010 samples
+    
+    // Trigger grain
+    grainTrig = trig : ba.impulsify;
+    
+    // Read position with varispeed
+    readPos = (pos * bufferSize + varispeed * 1000) % bufferSize;
+    
+    // Generate grain
+    grain(i) = rdtable(buffer, int(readPos + i)) * window(i, grainSamples);
+    
+    // Overlap-add multiple grains
+    numGrains = 4;
+    grainOut(i) = par(j, numGrains, grain(i + j * grainSamples/numGrains)) : sum;
+    
+    // Smooth crossfade between grains
+    smoothed = grainOut : ba.smoo(smooth);
+    
+    out = smoothed, smoothed;
+};
+
+Note: For actual implementation, you'll need to:
+1. Load sample files into Faust tables
+2. Manage buffer writing for recording
+3. Handle multiple samples
+
+---
+OPTION C: Torso S-4 Style Sampler + Granular
+---
+
+Combines sampling with granular processing:
+
+torso_s4_sampler(trig, pitch, grain_size, texture) = out
+with{
+    // Material (sample playback)
+    material = sample_playback(trig, pitch);
+    
+    // Granular processor
+    granular = granular_processor(material, grain_size, texture);
+    
+    // Filter
+    filtered = granular : fi.lowpass(4, 5000, 0.5);
+    
+    // Color (dual-band distortion)
+    colored = dual_band_distortion(filtered, texture);
+    
+    // Space (delay + reverb)
+    spaced = colored : delay_effect : reverb_effect;
+    
+    out = spaced * 0.5, spaced * 0.5;
+};
+
+---
+OPTION D: Simple Sample Playback (for quick implementation)
+---
+
+simple_sampler(trig, note, sample_idx) = out
+with{
+    // Note to frequency ratio
+    freqRatio = pow(2, (note-60)/12);
+    
+    // Select sample based on index
+    // In real implementation, load different sample tables
+    sampleTable = select16(sample_idx,
+        kick_sample, snare_sample, hat_sample, clap_sample,
+        bass_sample, lead_sample, pad_sample, fx_sample,
+        sample9, sample10, sample11, sample12,
+        sample13, sample14, sample15, sample16);
+    
+    // Phasor for playback
+    phase = os.osc_phasor(1.0, 0, trig);
+    
+    // Read from sample (pitch shifted)
+    pos = phase * freqRatio;
+    sample = rdtable(sampleTable, int(pos * tableSize));
+    
+    // Envelope
+    env = en.adsr(0.001, 0.05, 0.8, 0.1, trig);
+    
+    out = sample * env, sample * env;
+};
+
+---
+RECOMMENDATION:
+---
+
+Start with OPTION D (Simple Sample Playback) for quick implementation.
+Add OPTION B (Granular) later for advanced features.
+
+Add to Main.dsp:
+  process = Plex <: Timecircuit, seven : Warp;
+
+Where seven = simple_sampler or granular_sampler.
+
+================================================================================
+PART 4: EFFECTS EXPANSION (Component Warp/one)
+================================================================================
+
+Your current Warp has delay and reverb. Add these Tonverk effects:
+
+---
+TONVERK EFFECT 1: Compressor (Soft-Knee)
+---
+
+From research.txt section 3.3:
+
+tv_compressor(input, threshold, ratio, attack, release, makeup, knee) = out
+with{
+    // Convert threshold from dB to linear
+    TLin = ba.db2linear(threshold);
+    KdB = knee * 20;
+    
+    // Envelope follower
+    env = dm.rms_follower_ar(attack, release) : abs;
+    
+    // Soft-knee compression
+    over = env - TLin + KdB/2;
+    posOver = max(over, 0.0);
+    GRdB = (posOver * posOver) / (2.0 * KdB * (ratio - 1.0));
+    gainRed = ba.db2linear(-GRdB);
+    
+    // Apply gain reduction
+    compressed = input * gainRed * makeup;
+    
+    out = compressed;
+};
+
+---
+TONVERK EFFECT 2: Daisy Delay
+---
+
+From research.txt section 3.4:
+
+tv_daisy_delay(input, time, feedback, width, mod_depth, skew, filt) = outl, outr
+with{
+    // Drive/saturation pre-delay
+    driven = input * 2 : ef.cubicnl(0.3, 0);
+    
+    // Max delay time (1 second)
+    maxTime = ma.SR;
+    
+    // Delay times with skew
+    timeL = time * (1 - skew * 0.5);
+    timeR = time * (1 + skew * 0.5);
+    
+    // Delay lines
+    delayL = de.delay(maxTime, int(timeL * maxTime / 1000));
+    delayR = de.delay(maxTime, int(timeR * maxTime / 1000));
+    
+    // Feedback with lowpass filter
+    fb = feedback * 0.8;
+    feedbackL = delayL * fb : fi.lowpass(4, filt * 10000);
+    feedbackR = delayR * fb : fi.lowpass(4, filt * 10000);
+    
+    // Cross-feedback for stereo width
+    crossL = delayR * feedback * width * 0.5;
+    crossR = delayL * feedback * width * 0.5;
+    
+    // Modulation (wow/flutter)
+    modLFO = os.oscsin(0.5) * mod_depth * 0.001;
+    modTimeL = timeL * (1 + modLFO);
+    modTimeR = timeR * (1 - modLFO);
+    
+    outl = driven + feedbackL + crossL;
+    outr = driven + feedbackR + crossR;
+};
+
+---
+TONVERK EFFECT 3: Supervoid Reverb
+---
+
+From research.txt section 3.16:
+
+tv_supervoid(input, pre, decay, freq, gain, hpf, lpf, mix) = outl, outr
+with{
+    // Pre-delay
+    predelaySamps = int(pre * ma.SR / 1000);
+    predelayed = input @ predelaySamps;
+    
+    // FDN Reverb
+    // Using Faust's built-in stereo FDN
+    reverb = re.stereo_fdn_demo;
+    
+    // Shelving filters in feedback
+    // freq: shelving filter frequency (20-20000 Hz)
+    // gain: shelving filter gain (-24 to +24 dB)
+    fdn_freq = 1000 * pow(2, (freq-0.5)*10); // Map 0-1 to 100-20000 Hz
+    fdn_gain = gain * 24 - 12; // Map 0-1 to -12 to +12 dB
+    
+    // Apply shelving in FDN feedback
+    // (This requires custom FDN implementation for full control)
+    // For now, use the built-in FDN with damping parameters
+    
+    // High-pass and low-pass on input
+    filtered = predelayed : fi.highpass(4, hpf * 10000) : fi.lowpass(4, lpf * 10000);
+    
+    // FDN with adjusted parameters
+    reverb_out = re.stereo_fdn_demo(filtered, decay, 0.5);
+    
+    // Mix dry/wet
+    outl, outr = ef.drywet(filtered, reverb_out, mix);
+};
+
+---
+TONVERK EFFECT 4: Comb± Filter
+---
+
+From research.txt section 3.2:
+
+tv_comb_filter(input, spd, dep, sph, dtun, freq, fbk, lpf_freq, mix) = out
+with{
+    // LFO for modulation
+    lfo = os.oscsin(spd) * dep * 0.5 + sph;
+    
+    // Comb filter with modulated frequency
+    modFreq = freq * (1 + lfo * 0.1);
+    modFbk = fbk * (1 + lfo * 0.05);
+    
+    // Comb+ or Comb- based on feedback sign
+    if (fbk > 0) {
+        // Comb+
+        comb = fi.comb(int(ma.SR/modFreq), modFbk) : fi.lowpass(4, lpf_freq*10000);
+    } else {
+        // Comb-
+        comb = fi.comb(int(ma.SR/modFreq), -modFbk) : fi.lowpass(4, lpf_freq*10000);
+    }
+    
+    out = ef.drywet(input, comb, mix);
+};
+
+---
+TONVERK EFFECT 5: Degrader (Bitcrusher + SRR)
+---
+
+From research.txt section 3.5:
+
+tv_degrader(input, br, over, srr, drop, rate, dep, frez, f_tim) = out
+with{
+    // Bit reduction
+    bits = int(16 - br * 15) + 1; // 1-16 bits
+    bitScale = pow(2, bits);
+    bitcrushed = int(input * bitScale) / bitScale;
+    
+    // Sample rate reduction
+    sr_factor = int(1 + srr * 31); // 1-32x reduction
+    if (sr_factor > 1) {
+        downsampled = input @ (sr_factor);
+        held = downsampled : de.delay(1, sr_factor-1) : *(sr_factor);
+    } else {
+        held = input;
+    }
+    
+    // Sample dropping
+    dropProb = drop * 0.1; // 0-10%
+    random = no.noise;
+    dropped = select2(random < dropProb, held, bitcrushed);
+    
+    // Freeze (simplified)
+    // In a real implementation, use a circular buffer
+    freezeBuffer = rwtable(44100, freezeIdx);
+    if (frez > 0.5) {
+        // Freeze mode: read from fixed position
+        frozen = rdtable(freezeBuffer, int(f_tim * 44100));
+    } else {
+        // Normal mode: write and passthrough
+        freezeIdx = freezeIdx + 1 % 44100;
+        frozen = dropped;
+    }
+    
+    out = frozen;
+};
+
+---
+TONVERK EFFECT 6: Dirtshaper (Saturation)
+---
+
+From research.txt section 3.6:
+
+tv_dirtshaper(input, drv, rect, hpf, lpf, nois, n_freq, n_res, mix) = out
+with{
+    // Drive
+    driven = input * drv;
+    
+    // Rectification (wavefolding)
+    rectified = ba.lininterp(rect, driven, abs(driven));
+    
+    // Saturation
+    saturated = rectified : ef.cubicnl(1.0, 0);
+    
+    // Noise
+    noise = no.noise : fi.resonbp(n_freq * 10000, n_res) * nois;
+    
+    // Mix noise before/after saturation
+    noiseIn = input * noise * 0.5;
+    noiseOut = saturated * noise * 0.5;
+    
+    // Filters
+    filtered = (saturated + noiseIn + noiseOut) : fi.highpass(4, hpf * 10000) : fi.lowpass(4, lpf * 10000);
+    
+    out = ef.drywet(input, filtered, mix);
+};
+
+---
+TONVERK EFFECT 7: Frequency Warper
+---
+
+From research.txt section 3.8 - requires FFT, simplified version:
+
+tv_freq_warper(input, spd, dep, sph, lag, shft, sprd, sbnd, mix) = out
+with{
+    // Simplified without FFT: use pitch shifting via granular
+    // This is a placeholder - full FFT implementation is complex
+    
+    // LFO for modulation
+    lfo = os.oscsin(spd) * dep * 0.5 + sph : si.smoo(lag);
+    
+    // Shift frequency (simplified using ring modulation)
+    shiftFreq = 100 * (shft - 0.5) * 2; // -100 to 100 Hz
+    shifted = input * os.oscsin(shiftFreq * lfo * sprd);
+    
+    // Band filtering
+    bandFreq = sbnd * 10000;
+    bandFiltered = shifted : fi.bandpass(4, bandFreq, 0.5);
+    
+    out = ef.drywet(input, bandFiltered, mix);
+};
+
+Note: Full FFT-based Frequency Warper requires significant DSP. Consider:
+- Using Faust's fft.lib
+- Implementing phase vocoder
+- Or using granular pitch shifting as alternative
+
+---
+TONVERK EFFECT 8: Panoramic Chorus
+---
+
+From research.txt section 3.12:
+
+tv_panoramic_chorus(input, depth, speed, width, mix) = outl, outr
+with{
+    // LFO for modulation
+    lfoL = os.oscsin(speed) * depth;
+    lfoR = os.oscsin(speed, 0.5) * depth * width * 2;
+    
+    // Delay times
+    delayL = 0.001 + lfoL * 0.003; // 1-4ms
+    delayR = 0.001 + lfoR * 0.003;
+    
+    // Max delay
+    maxDelay = 0.01 * ma.SR;
+    
+    // Chorus delays
+    chorusL = input @ int(delayL * ma.SR);
+    chorusR = input @ int(delayR * ma.SR);
+    
+    // Mix with dry
+    outl = ef.drywet(input, chorusL, mix);
+    outr = ef.drywet(input, chorusR, mix);
+};
+
+---
+TONVERK EFFECT 9: Phase 98 Phaser
+---
+
+From research.txt section 3.13:
+
+tv_phase98(input, rate, depth, feedback, stages, mix) = out
+with{
+    // LFO for modulation
+    lfo = os.oscsin(rate) * depth;
+    
+    // 98 allpass stages
+    // In practice, 8-16 is sufficient for good phasing
+    numStages = min(16, int(stages * 20 + 4));
+    
+    // Allpass cascade
+    allpass(i) = fi.allpass(int(50 + i*10), 0.5 + feedback * 0.4);
+    
+    // Build chain of allpass filters
+    phaser = input;
+    for (i = 0; i < numStages; i++) {
+        modFreq = 100 + i*50 + lfo * 100;
+        phaser = phaser : fi.allpass(int(ma.SR/modFreq), 0.5 + feedback * 0.4);
+    }
+    
+    out = ef.drywet(input, phaser, mix);
+};
+
+---
+TONVERK EFFECT 10: Filterbank (8-band)
+---
+
+From research.txt section 3.7:
+
+tv_filterbank(input, a_gain, b_gain, c_gain, d_gain, e_gain, f_gain, g_gain, h_gain) = out
+with{
+    // Band frequencies from research
+    bands = par(i, 8,
+        fi.bandpass(4, 90, 1.0) * a_gain,
+        fi.bandpass(4, 121.9, 1.0) * b_gain,
+        fi.bandpass(4, 224.8, 1.0) * c_gain,
+        fi.bandpass(4, 418, 1.0) * d_gain,
+        fi.bandpass(4, 777.4, 1.0) * e_gain,
+        fi.bandpass(4, 1445.8, 1.0) * f_gain,
+        fi.bandpass(4, 2688.6, 1.0) * g_gain,
+        fi.highpass(4, 4000, 1.0) * h_gain);
+    
+    out = sum(i, 8, bands(i));
+};
+
+---
+RECOMMENDATION:
+---
+
+Add these effects to Warp component as selectable effect types:
+
+1. Add a new effect slot: tv_compressor
+2. Add a new effect slot: tv_supervoid (replaces current reverb)
+3. Add a new effect slot: tv_dirtshaper (for saturation)
+4. Add a new effect slot: tv_panoramic_chorus
+5. Add a new effect slot: tv_phase98
+
+Or create a Tonverk-style effect chain per channel.
+
+================================================================================
+PART 5: GRANULAR & SPECTRAL PROCESSING
+================================================================================
+
+From research.txt, these unique processors could enhance your groovebox:
+
+---
+GRANULAR 1: Morphagene-Style Granular
+---
+
+Based on Make Noise Morphagene:
+
+morphagene(trig, splice_pos, gene_size, organize, morph, varispeed, smooth, prob) = out
+with{
+    // Buffer (1 second)
+    bufferSize = 44100;
+    buffer = rwtable(bufferSize, writeIdx);
+    
+    // Splice position (0-1)
+    readBase = splice_pos * bufferSize;
+    
+    // Gene size (10-1000ms)
+    grainSamples = int(10 + gene_size * 990);
+    
+    // Window functions
+    hann(i) = 0.5 * (1 - cos(2*ma.PI*i/grainSamples));
+    bartlett(i) = 2*i/grainSamples < 1 ? 2*i/grainSamples : 2 - 2*i/grainSamples;
+    trapezoid(i) = 1.0;
+    
+    windowFunc(i) = 
+        organize < 0.33 ? hann(i) :
+        (organize < 0.66 ? bartlett(i) : trapezoid(i));
+    
+    // Morph: interpolation between splice positions
+    morphPos = readBase + morph * 2000 - 1000;
+    
+    // Varispeed: playback rate
+    speed = 1.0 + varispeed * 2 - 1.0; // 0.5x to 2x
+    
+    // Generate grain
+    grain(i) = rdtable(buffer, int(morphPos + i * speed)) * windowFunc(i);
+    
+    // Multiple grains for overlap
+    numGrains = 4;
+    grainOut = par(j, numGrains, 
+        par(i, grainSamples, grain(i + j*grainSamples/numGrains)) : sum) : sum;
+    
+    // Smooth
+    smoothed = grainOut : ba.smoo(smooth);
+    
+    // Probability gate
+    rand = no.noise;
+    gated = select2(rand < prob, smoothed, 0.0);
+    
+    // Write to buffer (for recording - optional)
+    writeIdx = (writeIdx + 1) % bufferSize;
+    
+    out = gated * 0.5, gated * 0.5;
+};
+
+---
+GRANULAR 2: Torso S-4 Granular
+---
+
+Simplified from research.txt section 6:
+
+torso_granular(input, contour, size, pitch, textures) = out
+with{
+    // Buffer
+    bufferSize = 44100 * 2; // 2 seconds
+    buffer = rwtable(bufferSize, writeIdx);
+    
+    // Write input to buffer
+    writeIdx = (writeIdx + 1) % bufferSize;
+    
+    // Grain parameters
+    grainSize = int(10 + size * 2000); // 10-2010 samples
+    grainPitch = pow(2, (pitch - 0.5) * 24/12); // -2 to +2 octaves
+    
+    // Grain envelope (contour)
+    contourEnv(i) = exp(-i*5/grainSize); // Exponential decay
+    
+    // Texture: randomness in grain position
+    textureOffset = textures * 1000 * (no.noise - 0.5);
+    
+    // Read grains
+    grain(i) = rdtable(buffer, int((writeIdx - i * grainPitch - textureOffset) % bufferSize)) 
+              * contourEnv(i);
+    
+    // Overlap-add
+    numGrains = 8;
+    out = par(j, numGrains, par(i, grainSize, grain(i + j*grainSize/numGrains)) : sum;
+    
+    out = out * 0.1, out * 0.1; // Normalize
+};
+
+---
+SPECTRAL: Panharmonium-Style Resynthesis
+---
+
+From research.txt section 18:
+
+panharmonium(input, spectral_cloud, shift, warp, decay, spread, sculpt, complex, voices, blend) = out
+with{
+    // This requires FFT - simplified version using filter bank
+    
+    // 48-band filter bank (simplified to 12 bands)
+    bands = par(i, 12, 
+        fi.bandpass(4, 50 * pow(2, i/1.5), 1.0));
+    
+    // Split input into bands
+    bandSignals(i) = input : bands(i);
+    
+    // Apply spectral cloud threshold
+    // spectral_cloud: 0=only peaks, 1=all bands
+    threshold = 0.001 * pow(10, spectral_cloud * 4 - 2);
+    
+    // Envelope follower per band
+    envs(i) = dm.rms_follower_ar(0.01, 0.1) : bandSignals(i);
+    
+    // Only pass bands above threshold * cloud
+    activeBands(i) = select2(envs(i) > threshold, bandSignals(i), 0.0);
+    
+    // Shift frequencies
+    shiftedBands(i) = activeBands(i) : fi.bandpass(4, 
+        50 * pow(2, (i + shift*6 - 3)/1.5), 1.0);
+    
+    // Warp: nonlinear frequency spacing
+    warpFactor = warp * 2 - 1; // -1 to +1
+    warpedBands(i) = shiftedBands(i) : fi.bandpass(4,
+        50 * pow(2, (i + warpFactor * i*(i/12-0.5))/1.5), 1.0);
+    
+    // Decay per oscillator (band)
+    decayTime = 0.1 + decay * 2; // 0.1-2.1 seconds
+    decayFactor = exp(-1.0 / (ma.SR * decayTime));
+    decayedBands(i) = warpedBands(i) * decayFactor;
+    
+    // Spread: stereo positioning
+    spreadPos(i) = (i/12 - 0.5) * spread * 2;
+    
+    // Sum bands with stereo spread
+    outl = sum(i, 12, decayedBands(i) * (1 - spreadPos(i)));
+    outr = sum(i, 12, decayedBands(i) * (1 + spreadPos(i)));
+    
+    // Sculpt: spectral envelope
+    sculptFiltered = (outl, outr) : fi.lowpass(4, 100 + sculpt*10000) : 
+                    fi.highpass(4, 10000 - sculpt*9000);
+    
+    // Complex: add inharmonicity
+    if (complex > 0) {
+        complexBands(i) = warpedBands(i) : fi.bandpass(4,
+            50 * pow(2, (i + complex*0.5*i)/1.5), 1.0);
+        complexOut = sum(i, 12, complexBands(i)) * 0.5;
+        outl = outl + complexOut * 0.3;
+        outr = outr + complexOut * 0.3;
+    }
+    
+    // Blend with dry
+    outl = ba.lininterp(blend, input, outl);
+    outr = ba.lininterp(blend, input, outr);
+};
+
+Note: Full Panharmonium requires FFT. This is a filter-bank approximation.
+
+---
+RECOMMENDATION:
+---
+
+Add granular processing as an effect option in Warp:
+
+1. Add morphagene as a selectable effect type
+2. Add torso_granular as another option
+3. Add panharmonium as a spectral effect (for ambient pads)
+
+Or create a dedicated granular track type.
+
+================================================================================
+PART 6: MODULATION SYSTEMS
+================================================================================
+
+Your current sequencer (nine) has basic parameter output. Enhance with:
+
+---
+MODULATION 1: LFO System (from Digitakt/Syntakt)
+---
+
+lfo_module(speed, mult, wave, dest, fade, depth, mode, phase) = out
+with{
+    // Speed with multiplier
+    freq = speed * mult;
+    
+    // Waveform selection
+    waveforms = par(i, 6,
+        os.oscsin(freq),      // 0: Sin
+        os.oscsaw(freq),      // 1: Saw
+        os.osctri(freq),      // 2: Tri
+        os.oscsquare(freq),   // 3: Square
+        os.oscpulse(freq, 0.5) : ba.spulse(10), // 4: S&H (sampled pulse)
+        exp(-os.phasor(freq) * 5) * 2 - 1);    // 5: Exp
+    
+    waveform = ba.select6(int(wave), waveforms);
+    
+    // Phase offset
+    phased = waveform @ int(phase * ma.SR / freq);
+    
+    // Fade in/out (bipolar)
+    fadeEnv = en.are(0.1, 0.1, 1.0); // Always on for LFO
+    faded = phased * fadeEnv * 2 - 1; // Bipolar: -1 to +1
+    
+    // Depth scaling
+    depthScaled = faded * depth * 2 - 1; // Map 0-1 depth to -1 to +1
+    
+    // Mode
+    // FREE: always running
+    // TRIG: reset on trigger (not implemented here)
+    // HOLD: hold last value (not implemented here)
+    // ONE: one shot (not implemented here)
+    // HALF: half cycle (not implemented here)
+    
+    out = depthScaled;
+};
+
+---
+MODULATION 2: ADSR Envelope (Enhanced)
+---
+
+adsr_enhanced(trig, a, d, s, r, curve) = out
+with{
+    // Curve: -1=log, 0=linear, +1=exp
+    // Map curve to attack/decay curve parameter
+    atk_curve = curve;
+    dec_curve = curve;
+    rel_curve = curve;
+    
+    // Time conversions
+    atk = a * a * a * 0.5 + 0.001; // Non-linear mapping
+    dec = d * d * d * 0.5 + 0.001;
+    rel = r * r * r * 0.5 + 0.001;
+    
+    // Envelope with curve
+    env = en.adsr_with_curve(atk, dec, s, rel, trig, atk_curve, dec_curve, rel_curve);
+    
+    out = env;
+};
+
+---
+MODULATION 3: Random & S&H
+---
+
+mod_random(trig, rate, smooth) = out
+with{
+    // Random value on trigger
+    randomVal = no.noise : ba.spulse(1) : ba.impulsify;
+    
+    // Sample & Hold
+    sampled = randomVal @ int(trig * ma.SR);
+    
+    // Smooth
+    smoothed = sampled : si.smoo(smooth);
+    
+    // Bipolar: -1 to +1
+    out = smoothed * 2 - 1;
+};
+
+---
+MODULATION 4: Envelope Follower as Modulator
+---
+
+mod_env_follower(input, attack, release, min, max) = out
+with{
+    // Envelope follower
+    env = dm.rms_follower_ar(attack, release) : abs(input);
+    
+    // Scale to min/max range
+    scaled = min + (max - min) * env;
+    
+    out = scaled;
+};
+
+---
+RECOMMENDATION:
+---
+
+Add a modulation section to each synth and drum machine:
+
+// In synth_fx:
+modulation = hgroup("Mod",
+    lfo1 = lfo_module(...),
+    lfo2 = lfo_module(...),
+    env1 = adsr_enhanced(...),
+    env2 = adsr_enhanced(...),
+    rand = mod_random(...));
+
+// Apply modulation to parameters:
+mod_pitch = pitch + lfo1 * pitch_depth;
+mod_cutoff = cutoff + env1 * cutoff_depth;
+mod_amp = amp * (1 + lfo2 * tremolo_depth);
+
+================================================================================
+PART 7: NUMOGRAM-SPECIFIC INTEGRATION
+================================================================================
+
+Use numogram positions to control machine assignments and parameters:
+
+---
+NUMOGRAM MACHINE MAPPING
+---
+
+numogram_machine_selector(pos, trig, params) = out
+with{
+    // Map numogram position to machine type
+    // Using positions: 0,1,2,3,4,5,6,7,8,9
+    
+    position = int(pos) % 10;
+    
+    // Machine assignment
+    machine = position;
+    
+    // Position-based parameters
+    // Each position has unique character
+    
+    // 0: Clock/Master - no sound generation
+    // 1: Synth 1 - Lead
+    // 2: Synth 2 - Bass
+    // 3: Synth 3 - Pad
+    // 4: Sampler
+    // 5: Drum 1 - Kick
+    // 6: Drum 2 - Snare
+    // 7: Drum 3 - Hi-Hat
+    // 8: Drum 4 - Percussion
+    // 9: Effects
+    
+    if (machine == 1) {
+        out = lead_synth(trig, params);
+    } else if (machine == 2) {
+        out = bass_synth(trig, params);
+    } else if (machine == 3) {
+        out = pad_synth(trig, params);
+    } else if (machine == 4) {
+        out = sampler(trig, params);
+    } else if (machine >= 5 && machine <= 8) {
+        out = drum_machine(trig, machine-5, params);
+    } else {
+        out = 0, 0;
+    }
+};
+
+---
+NUMOGRAM HARMONIC MAPPING
+---
+
+numogram_harmonic(pos, baseFreq) = out
+with{
+    // Numogram ratios based on Gurdjieff enneagram
+    // These are traditional ratios, adjust to taste
+    
+    ratios = par(i, 10,
+        1.0,       // 0: Unison
+        9.0/8.0,   // 1: Major 2nd
+        5.0/4.0,   // 2: Major 3rd
+        4.0/3.0,   // 3: Perfect 4th
+        3.0/2.0,   // 4: Perfect 5th
+        5.0/3.0,   // 5: Major 6th
+        7.0/4.0,   // 6: Minor 7th
+        2.0,       // 7: Octave
+        9.0/4.0,   // 8: Major 9th
+        7.0/3.0);  // 9: Minor 10th
+    
+    ratio = ratios : ba.selectn(10, int(pos) % 10);
+    
+    out = baseFreq * ratio;
+};
+
+---
+NUMOGRAM PARAMETER MAPPING
+---
+
+numogram_param_map(pos, param_value) = out
+with{
+    position = int(pos) % 10;
+    
+    // Map position to parameter scaling
+    // Example: position 8 (drums) might have faster decay
+    // Position 1 (synth) might have longer decay
+    
+    // Create a scaling factor based on position
+    scales = par(i, 10,
+        1.0,  // 0
+        1.5,  // 1
+        0.8,  // 2
+        1.2,  // 3
+        1.0,  // 4
+        0.6,  // 5 - drums have fast decay
+        0.7,  // 6
+        0.5,  // 7 - hi-hats very fast
+        0.9,  // 8
+        1.1); // 9
+    
+    scale = scales : ba.selectn(10, position);
+    
+    out = param_value * scale;
+};
+
+---
+NUMOGRAM EFFECT ROUTING
+---
+
+numogram_effect_route(pos, input) = outl, outr
+with{
+    position = int(pos) % 10;
+    
+    // Route to different effects based on position
+    if (position % 2 == 0) {
+        // Even positions -> Delay
+        out = input : stereo_delay;
+    } else if (position % 3 == 0) {
+        // Positions divisible by 3 -> Reverb
+        out = input : stereo_reverb;
+    } else {
+        // Others -> Both
+        outl = input : delay : reverb;
+        outr = input : delay : reverb;
+    }
+};
+
+---
+RECOMMENDATION:
+---
+
+Integrate numogram mapping into your existing components:
+
+1. In nine (sequencer): Use numogram_harmonic for note generation
+2. In eight (drums): Use numogram_param_map for drum-specific parameters
+3. In synth_fx: Use numogram_machine_selector for synth type selection
+4. In Warp: Use numogram_effect_route for effect routing
+
+================================================================================
+PART 8: INTEGRATION ROADMAP
+================================================================================
+
+Prioritized implementation order:
+
+PHASE 1: Quick Wins (1-2 days)
+----------------------------
+1. Fix the sequencer bug (c(i) vs v(i))
+2. Implement basic synth_fx with OP-Z engine selector
+3. Add simple sampler (Option D)
+4. Test all components compile
+
+PHASE 2: Drum Enhancement (2-3 days)
+-------------------------------
+5. Replace eight with Machinedrum engine selector
+6. Add TRX 808/909 models
+7. Add Analog Rytm analog engine
+8. Test drum sounds
+
+PHASE 3: Synth Expansion (3-5 days)
+------------------------------
+9. Add Digitone FM engine to synth_fx
+10. Add Monomachine engine selector
+11. Add Yamaha SY vector synthesis
+12. Add OP-1 engine selector
+
+PHASE 4: Effects (2-3 days)
+-------------------
+13. Add Tonverk compressor
+14. Add Tonverk Supervoid reverb
+15. Add Tonverk Dirtshaper
+16. Add Tonverk Panoramic Chorus
+
+PHASE 5: Advanced Features (4-7 days)
+----------------------------------
+17. Add granular sampler
+18. Add Panharmonium spectral resynthesis
+19. Add Torso S-4 style granular
+20. Deep numogram integration
+21. Modulation system
+22. Parameter locks per step
+
+PHASE 6: Polish (2-4 days)
+-----------------------
+23. Refactor code
+24. Optimize CPU
+25. Add UI grouping
+26. Add presets
+27. MIDI control
+28. Testing and bug fixing
+
+Estimated Total: 16-28 days for full implementation
+
+================================================================================
+PART 9: CODE INTEGRATION EXAMPLES
+================================================================================
+
+---
+EXAMPLE 1: Updated synth_fx with Engine Selector
+---
+
+// Replace current synth_fx (lines 242-248 in Main.dsp) with:
+
+synth_fx(f1,v1,c1,f2,v2,c2,f3,v3,c3,f4,v4,c4,tphz) = out
+with{
+    // Combine triggers from all lanes
+    trig1 = v1>0 : ba.impulsify;
+    trig2 = v2>0 : ba.impulsify;
+    trig3 = v3>0 : ba.impulsify;
+    trig4 = v4>0 : ba.impulsify;
+    main_trig = (trig1 + trig2 + trig3 + trig4) : ba.impulsify;
+    
+    // Note from lane 1 frequency
+    note = 60 + (f1 * 48); // 0-1 -> 60-108 (C4-C7)
+    freq = 440 * ma.pow(2, (note-69)/12);
+    
+    // Velocity from lane 1
+    vel = v1;
+    
+    // Engine selection from lane 3 control (c3)
+    // Map 0-1 to 0-9 engine types
+    engine_type = int(c3 * 10);
+    
+    // OP-Z style engine selector
+    opz_engines = par(i, 10,
+        pulse_engine(main_trig, freq, 0.3),     // 0: PULSE
+        wave_engine(main_trig, freq, 0),      // 1: WAVE
+        fm_engine(main_trig, freq, 1.5),      // 2: FM
+        kick_engine(main_trig, freq),        // 3: KICK
+        snare_engine(main_trig, freq),       // 4: SNARE
+        hat_engine(main_trig, freq*2),       // 5: HAT
+        bass_engine(main_trig, freq),        // 6: BASS
+        lead_engine(main_trig, freq),        // 7: LEAD
+        chord_engine(main_trig, freq),       // 8: CHORD
+        pulse_engine(main_trig, freq, 0.5));  // 9: PULSE (alt)
+    
+    selected_engine = opz_engines : ba.selectn(10, engine_type);
+    
+    // Control lane 2 for parameter modulation
+    // Modulate frequency with c2
+    freq_mod = freq * (1 + (c2 - 0.5) * 0.2); // ±10% modulation
+    
+    // Recreate engines with modulation
+    // (This would require restructuring - for now use simple version)
+    
+    // Simplified: use pre-made engines without freq mod
+    out = selected_engine * vel * 0.4, selected_engine * vel * 0.4;
+};
+
+---
+EXAMPLE 2: Enhanced eight with Drum Machine Selector
+---
+
+// Replace eight component with:
+
+eight = vgroup("[4]8", ins)
+with{
+    ins(f1,v1,c1,f2,v2,c2,f3,v3,c3,f4,v4,c4,tphz) = out
+    with{
+        // Convert velocity to triggers
+        t1 = v1>0 : ba.impulsify;
+        t2 = v2>0 : ba.impulsify;
+        t3 = v3>0 : ba.impulsify;
+        t4 = v4>0 : ba.impulsify;
+        
+        // Drum machine selection from control lanes
+        // c1, c2, c3, c4 select drum type for each lane
+        drum1_type = int(c1 * 8); // 0-7
+        drum2_type = int(c2 * 8);
+        drum3_type = int(c3 * 8);
+        drum4_type = int(c4 * 8);
+        
+        // Create drum machines
+        dm1 = drum_machine(t1, drum1_type, f1, v1);
+        dm2 = drum_machine(t2, drum2_type, f2, v2);
+        dm3 = drum_machine(t3, drum3_type, f3, v3);
+        dm4 = drum_machine(t4, drum4_type, f4, v4);
+        
+        preout = dm1 + dm2 + dm3 + dm4;
+        out = ma.tanh(preout) * (1-(tphz==0)) <: _, _;
+    };
+    
+    // Drum machine with type selector
+    drum_machine(trig, dtype, freq_param, vel_param) = out
+    with{
+        // Map freq_param to actual frequency
+        freq = 100 + freq_param * 900; // 100-1000 Hz
+        
+        // TRX 808 Kick
+        trx808(trig, freq) = out
+        with{
+            pitchEnv = en.are(0.001, 0.2, trig);
+            ampEnv = en.are(0.001, 0.4, trig);
+            baseFreq = freq * pitchEnv;
+            click = no.noise * en.are(0.001, 0.05, trig);
+            tone = os.oscsin(baseFreq) * pitchEnv;
+            out = (tone + click * 0.3) * ampEnv : fi.lowpass(4000, 0.5);
+        };
+        
+        // TRX 909 Kick
+        trx909(trig, freq) = out
+        with{
+            pitchEnv = en.are(0.001, 0.3, trig);
+            ampEnv = en.are(0.001, 0.3, trig);
+            baseFreq = freq * pitchEnv;
+            tone = os.oscsin(baseFreq) + os.oscsin(baseFreq*2)*0.5;
+            click = os.pulse(baseFreq*8, 0.2) * en.are(0.001, 0.02, trig);
+            out = ((tone + click) * ampEnv) : fi.lowpass(3000, 0.3);
+        };
+        
+        // EFM
+        efm(trig, freq) = out
+        with{
+            modFreq = freq * 1.5;
+            carrierFreq = freq;
+            mod = os.oscsin(modFreq) * en.are(0.01, 0.5, trig);
+            carrier = os.oscsin(carrierFreq + mod * 5);
+            noise = no.noise * en.are(0.001, 0.1, trig);
+            out = (carrier + noise * 0.2) : fi.lowpass(5000, 0.5);
+        };
+        
+        // SIDSID
+        sid(trig, freq) = out
+        with{
+            saw = os.saw(freq);
+            square = os.square(freq);
+            triangle = os.tri(freq);
+            noise = no.noise;
+            mixed = (saw + square + triangle) * 0.5 + noise * 0.2;
+            out = mixed * en.are(0.001, 0.3, trig) : fi.lowpass(3000, 0.4);
+        };
+        
+        // Noise
+        noise_drum(trig, freq) = out
+        with{
+            white = no.noise;
+            filtered = white : fi.highpass(4, 200 + freq * 0.1);
+            out = filtered * en.are(0.001, 0.1, trig);
+        };
+        
+        // GND (sine to noise)
+        gnd(trig, freq) = out
+        with{
+            sine = os.oscsin(freq);
+            noise = no.noise * freq * 0.001;
+            mixed = ba.lininterp(0.5, sine, noise);
+            out = mixed * en.are(0.001, 0.2, trig);
+        };
+        
+        // Hat
+        hat(trig, freq) = out
+        with{
+            env = en.are(0.001, 0.05, trig);
+            noise = no.noise;
+            filtered = noise : fi.bandpass(4, freq, 0.5);
+            out = filtered * env * 0.7;
+        };
+        
+        // Snare
+        snare(trig, freq) = out
+        with{
+            toneEnv = en.are(0.001, 0.2, trig);
+            noiseEnv = en.are(0.001, 0.1, trig);
+            tone = os.oscsin(freq * (1 + toneEnv)) * toneEnv;
+            noise = no.noise * noiseEnv;
+            out = (tone * 0.5 + noise * 0.5) : fi.highpass(4, 500);
+        };
+        
+        // Select drum machine
+        drums = par(i, 8,
+            trx808(trig, freq),
+            trx909(trig, freq),
+            efm(trig, freq),
+            sid(trig, freq),
+            noise_drum(trig, freq),
+            gnd(trig, freq),
+            hat(trig, freq),
+            snare(trig, freq));
+        
+        out = drums : ba.selectn(8, dtype);
+    };
+};
+
+---
+EXAMPLE 3: Adding seven (Sampler) to Process Chain
+---
+
+// Add this before Warp in Main.dsp:
+
+seven = vgroup("[6]7", sampler)
+with{
+    sampler(trig1, trig2, trig3, trig4, f1, f2, f3, f4, v1, v2, v3, v4, c1, c2, c3, c4, tphz) = out
+    with{
+        // Simple sample playback per lane
+        // Lane 1: Sample 1
+        sample1 = simple_sampler(trig1, f1 * 60 + 40, int(c1 * 16)) * v1;
+        
+        // Lane 2: Sample 2
+        sample2 = simple_sampler(trig2, f2 * 60 + 40, int(c2 * 16)) * v2;
+        
+        // Lane 3: Sample 3
+        sample3 = simple_sampler(trig3, f3 * 60 + 40, int(c3 * 16)) * v3;
+        
+        // Lane 4: Sample 4
+        sample4 = simple_sampler(trig4, f4 * 60 + 40, int(c4 * 16)) * v4;
+        
+        out = (sample1 + sample2 + sample3 + sample4) * 0.5, 
+              (sample1 + sample2 + sample3 + sample4) * 0.5;
+    };
+    
+    // Simple sampler function
+    simple_sampler(trig, note, sample_idx) = out
+    with{
+        // In real implementation, load samples from files
+        // For now, use noise as placeholder
+        sampleTable = no.noise;
+        
+        freqRatio = pow(2, (note-60)/12);
+        phase = os.osc_phasor(1.0, 0, trig);
+        pos = phase * freqRatio;
+        
+        sample = rdtable(sampleTable, int(pos * 1000));
+        env = en.adsr(0.001, 0.05, 0.8, 0.1, trig);
+        
+        out = sample * env;
+    };
+};
+
+// Then update process chain:
+process = Plex <: Timecircuit, seven : Warp;
+
+---
+EXAMPLE 4: Adding Tonverk Compressor to Warp
+---
+
+// In Warp component, add compressor as an option:
+
+// Add to the fourstereomixer section:
+compressor = vgroup("[4]Compressor", comp_out)
+with{
+    threshold = hslider("thr[style:knob]", -12, -40, 0, 1);
+    ratio = hslider("ratio[style:knob]", 4, 1.5, 20, 0.1);
+    attack = hslider("atk[style:knob]", 0.01, 0.001, 0.5, 0.001);
+    release = hslider("rel[style:knob]", 0.1, 0.01, 1, 0.01);
+    makeup = hslider("makeup[style:knob]", 0, -24, 24, 1);
+    knee = hslider("knee[style:knob]", 6, 0, 24, 1);
+    
+    comp_out = tv_compressor(_, threshold, ratio, attack, release, makeup, knee);
+};
+
+// Then add compressor to the effect chain:
+// Change: mix:rep~hgroup("[3]",(del,rev))
+// To:     mix:comp:rep~hgroup("[3]",(del,rev))
+
+================================================================================
+FINAL NOTES
+================================================================================
+
+1. **Start Small**: Begin with 1-2 machine models per component, test thoroughly.
+
+2. **CPU Considerations**: 
+   - Granular and FFT-based effects are CPU-intensive
+   - Use ~polyphonic instances carefully
+   - Consider voicing limits (4-8 voices max)
+
+3. **Testing Strategy**:
+   - Test each machine model in isolation first
+   - Verify parameter ranges work correctly
+   - Check for audio artifacts and clicks
+
+4. **Code Organization**:
+   - Use hgroup/vgroup for UI organization
+   - Add prefix to function names (tv_ for Tonverk, opz_ for OP-Z, etc.)
+   - Keep similar machines grouped together
+
+5. **Numogram Integration**:
+   - Use position for machine selection
+   - Use position for parameter mapping
+   - Use position for effect routing
+   - This creates the "magical" numogram experience
+
+6. **Future Extensions**:
+   - MIDI control for all parameters
+   - Preset save/load
+   - Audio input for sampling
+   - More granular controls
+
+================================================================================
+END OF PROPOSAL
+================================================================================
