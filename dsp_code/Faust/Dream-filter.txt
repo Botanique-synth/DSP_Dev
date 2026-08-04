@@ -1,0 +1,198 @@
+Filters.lib and vaeffects.lib analysis 
+
+https://faustlibraries.grame.fr/libs/
+
+======================================================
+Dream filter
+
+Filt(in,f,q,var,mode);
+
+8 modes : 
+
+LMHb || var filt typ 
+comb ||	var +- comb 
+Allp || nbr of series lp 
+Biqd || plastiky
+Moug ||
+Obrm ||
+Saky ||
+Korg ||
+
+Rzbk ||
+Fbnk || 
+
+eqaulize territory 
+
+Noch 	||
+Peak 	||
+Bell	||
+Shlv 	||
+
+======================================================
+
+filters
+
+(fi.)zero
+(fi.)pole 
+(fi.)integrator 
+(fi.)dcblockerat 
+(fi.)dcblocker 
+(fi.)lptN 
+(fi.)lptau 
+(fi.)lpt60 
+(fi.)lpt19 
+(fi.)ff_comb 
+(fi.)ff_fcomb 
+(fi.)ffcombfilter 
+(fi.)fb_comb_common 
+(fi.)fb_comb 
+(fi.)fb_fcomb 
+(fi.)rev1 
+(fi.)fbcombfilter and (fi.)ffbcombfilter 
+(fi.)allpass_comb 
+(fi.)allpass_fcomb 
+(fi.)rev2 
+(fi.)allpass_fcomb5 
+(fi.)allpass_fcomb1a 
+(fi.)iir 
+(fi.)fir 
+(fi.)conv and (fi.)convN 
+(fi.)tf1, (fi.)tf2 and (fi.)tf3 
+(fi.)notchw 
+(fi.)tf21, (fi.)tf22, (fi.)tf22t and (fi.)tf21t 
+(fi.)av2sv 
+(fi.)bvav2nuv 
+(fi.)iir_lat2 
+(fi.)allpassnt 
+(fi.)iir_kl 
+(fi.)allpassnklt 
+(fi.)iir_lat1 
+(fi.)allpassn1mt 
+(fi.)iir_nl 
+(fi.)allpassnnlt 
+(fi.)tf2np 
+(fi.)wgr 
+(fi.)nlf2 
+(fi.)apnl 
+(fi.)scatN 
+(fi.)scat
+(fi.)allpassn 
+(fi.)allpassnn 
+(fi.)allpassnkl 
+(fi.)allpass1m 
+(fi.)tf2s and (fi.)tf2snp 
+(fi.)tf1snp 
+(fi.)tf3slf 
+(fi.)tf1s 
+(fi.)tf2sb 
+(fi.)tf1sb 
+(fi.)resonlp 
+(fi.)resonhp 
+(fi.)resonbp 
+(fi.)lowpass 
+(fi.)highpass 
+(fi.)lowpass0_highpass1 
+(fi.)highpass_plus_lowpass 
+(fi.)highpass_minus_lowpass 
+(fi.)highpass_minus_lowpass_even 
+(fi.)highpass_plus_lowpass_even 
+(fi.)highpass_plus_lowpass_odd 
+(fi.)highpass_minus_lowpass_odd 
+(fi.)lowpass3e 
+(fi.)lowpass6e 
+(fi.)highpass3e 
+(fi.)highpass6e 
+(fi.)bandpass 
+(fi.)bandpass0_bandstop1 
+(fi.)bandstop 
+(fi.)bandpass6e 
+(fi.)bandpass12e 
+(fi.)pospass 
+(fi.)lowshelf 
+(fi.)low_shelf 
+(fi.)low_shelf1 
+(fi.)low_shelf1_l 
+(fi.)lowshelf_other_freq 
+(fi.)highshelf 
+(fi.)high_shelf 
+(fi.)high_shelf1 
+(fi.)high_shelf1_l 
+(fi.)highshelf_other_freq 
+(fi.)peak_eq 
+(fi.)peak_eq_cq 
+(fi.)peak_eq_rm 
+(fi.)spectral_tilt 
+(fi.)levelfilter 
+(fi.)levelfilterN 
+(fi.)mth_octave_filterbank[n] 
+(fi.)mth_octave_filterbank_alt 
+(fi.)mth_octave_filterbank3 
+(fi.)mth_octave_filterbank5 
+(fi.)mth_octave_filterbank_default 
+(fi.)filterbank 
+(fi.)filterbanki 
+(fi.)svf 
+(fi.)svf_morph 
+(fi.)svf_notch_morph 
+(fi.)SVFTPT 
+(fi.)dynamicSmoothing 
+(fi.)oneEuro 
+(fi.)lowpassLR4 
+(fi.)highpassLR4 
+(fi.)crossover2LR4 
+(fi.)crossover3LR4 
+(fi.)crossover4LR4 
+(fi.)crossover8LR4 
+(fi.)itu_r_bs_1770_4_kfilter 
+(fi.)avg_rect (fi.)avg_tau 
+(fi.)avg_t60 
+(fi.)avg_t19 
+(fi.)kalman
+
+vaeffects
+
+(ve.)moog_vcf 
+(ve.)moog_vcf_2b[n] 
+(ve.)moogLadder 
+(ve.)lowpassLadder4 
+(ve.)moogHalfLadder 
+
+(ve.)diodeLadder 
+
+(ve.)korg35LPF 
+(ve.)korg35HPF 
+
+(ve.)oberheim 
+(ve.)oberheimBSF 
+(ve.)oberheimBPF 
+(ve.)oberheimHPF 
+(ve.)oberheimLPF 
+
+(ve.)sallenKeyOnePole 
+(ve.)sallenKeyOnePoleLPF 
+(ve.)sallenKeyOnePoleHPF 
+(ve.)sallenKey2ndOrder (
+ve.)sallenKey2ndOrderLPF 
+(ve.)sallenKey2ndOrderBPF 
+(ve.)sallenKey2ndOrderHPF 
+
+(ve.)biquad 
+
+(ve.)lowpass2Matched 
+(ve.)highpass2Matched 
+(ve.)bandpass2Matched 
+(ve.)peaking2Matched 
+(ve.)lowshelf2Matched 
+(ve.)highshelf2Matched 
+
+(ve.)wah4 
+(ve.)autowah 
+
+(ve.)crybaby 
+(ve.)vocoder 
+(ve.)klonCentaur
+	
+
+
+
+	

@@ -1,0 +1,273 @@
+>  Oscillators.lib dissection 
+
+https://faustlibraries.grame.fr/libs/oscillators/
+
+This library provides a wide range of oscillator designs for sound synthesis. 
+It includes classic waveforms (sine, sawtooth, square, triangle), 
+band-limited and anti-aliased oscillators, 
+phase and frequency modulation units, 
+as well as noise-based and physical-model driven oscillators for advanced synthesis techniques in Faust.
+
+The oscillators library is organized into 9 sections:
+
+1 Wave-Table-Based Oscillators
+
+2 Low Frequency Oscillators
+
+3 Low Frequency Sawtooths
+
+4 Alias-Suppressed Sawtooth
+
+5 Alias-Suppressed Pulse, Square, and Impulse Trains
+
+6 Filter-Based Oscillators
+
+7 Waveguide-Resonator-Based Oscillators
+
+8 Casio CZ Oscillators
+
+9 PolyBLEP-Based Oscillators
+
+======================================================
+
+Wave-Table-Based Oscillators
+	(os.)sinwaveform
+	(os.)coswaveform
+	
+	(os.)phasor
+	(os.)hs_phasor
+	(os.)hsp_phasor     hard sync + phase 
+	
+	(os.)oscsin
+	(os.)hs_oscsin
+	(os.)osccos
+	(os.)hs_osccos
+
+	(os.)oscp
+	(os.)osci
+	(os.)osc
+	
+	(os.)m_oscsin
+	(os.)m_osccos
+
+Low Frequency Oscillators
+
+	(os.)lf_imptrain
+	(os.)lf_pulsetrainpos
+	(os.)lf_pulsetrain
+	(os.)lf_squarewavepos
+	(os.)lf_squarewave
+	(os.)lf_trianglepos
+	(os.)lf_triangle
+
+Low Frequency Sawtooths\
+	(os.)lf_rawsaw
+	(os.)lf_sawpos
+	(os.)lf_sawpos_phase
+	(os.)lf_sawpos_reset
+	(os.)lf_sawpos_phase_reset
+	(os.)lf_saw
+	
+Alias-Suppressed Sawtooth
+
+	(os.)sawN
+	(os.)sawNp
+	(os.)saw2
+	(os.)saw3
+	(os.)saw4
+	(os.)saw2ptr
+	(os.)saw2dpw
+	(os.)sawtooth
+	(os.)saw2f2
+	(os.)saw2f4
+	
+Alias-Suppressed Pulse, Square, and Impulse Trains
+
+	(os.)impulse
+	(os.)pulsetrainN
+	(os.)pulsetrain
+	(os.)squareN
+	(os.)square
+	(os.)imptrainN
+	(os.)imptrain
+	(os.)triangleN
+	(os.)triangle
+	
+Filter-Based Oscillators
+
+	(os.)oscb
+	(os.)oscrq
+	(os.)oscrs
+	(os.)oscrc
+	(os.)oscs
+	(os.)quadosc
+	(os.)sidebands
+	(os.)sidebands_list
+	(os.)dsf
+	(os.)twin_osc
+	(os.)rpm
+	
+Waveguide-Resonator-Based Oscillators
+
+	(os.)oscwc
+	(os.)oscws
+	(os.)oscq
+	(os.)oscw
+	
+Casio CZ Oscillators
+
+	(os.)CZsaw
+	(os.)CZsawP
+	(os.)CZsquare
+	(os.)CZsquareP
+	(os.)CZpulse
+	(os.)CZpulseP
+	(os.)CZsinePulse
+	(os.)CZsinePulseP
+	(os.)CZhalfSine
+	(os.)CZhalfSineP
+	(os.)CZresSaw
+	(os.)CZresTriangle
+	(os.)CZresTrap
+	
+PolyBLEP-Based Oscillators
+
+	(os.)polyblep
+	(os.)polyblep_saw
+	(os.)polyblep_square
+	(os.)polyblep_triangle
+
+
+======================================================
+Dream osc 
+Osc(f,Trig,Type,x,y,z,)
+
+25 modes :
+
+Rich 		|| sawV =  sqr  =  width
+East 		|| StoT =  fold =  symetry/curve
+Shpr		||
+Anal		||
+Osub		||
+Wtbl		|| 8x8 banks 
+Grwv		|| granulize waves 
+			// sync 5ths 
+Nbit 		||
+
+Lnfm		||
+Exfm		||
+
+Chrd		|| Qbit one for inspo 
+
+Adtv     	|| nsin = sprd = start
+Swrm		|| Swarm osc 
+Harm    	|| 24 harm
+Modl       	|| resonator > Rings green 
+
+Swrm 		||
+Dtun		||
+Noiz		|| Mtal = white =  metal tun 
+Mtal		||
+Txtr		|| crackle/rain 
+
+Kar+ 		|| rings red 
+
+/ drum engines  
+Khiq		||
+Snar		||
+Hatz		||
+
+Spxn		// define sampler based logic { grain,loop,splr }
+
+======================================================
+
+  -> Meld 
+
+with 2 params 
+
+basic shapes 
+dual basic shapes 
+Noisy shapes 
+
+Square sync
+suqre 5th 
+sub 
+
+swarm sine tri saw sqr 
+
+harmonic fm 
+fold fm 
+squelch 
+simple fm 
+chip 
+
+shepards
+tarp 
+extratone 
+noise loop 
+filtered noise 
+bitgrunge 
+crackle 
+rain 
+bubble 
+chord
+
+
+
+  -> Plaits 
+
+Features
+16 deep synthesis models
+
+8 synthesis models for pitched sounds
+
+	Two detuned virtual analog oscillators with continuously variable waveforms.
+	Variable slope triangle oscillator processed by a waveshaper and wavefolder.
+	2-operator FM with continuously variable feedback path.
+	Two independently controllable formants modulated by a variable shape window (VOSIM, Pulsar, Grainlet, Casio CZ-style resonant filter...).
+	24-harmonic additive oscillator.
+	Wavetable oscillator with four banks of 8x8 waves, with or without interpolation.
+	Chord generator, with divide down string/organ emulation or wavetables.
+	A collection of speech synthesis algorithms (formant filter, SAM, LPC), with phoneme control and formant shifting. Several banks of phonemes or segments of words are available.
+
+8 synthesis models for noise and percussions
+
+	Granular sawtooth or sine oscillator, with variable grain density, duration and frequency randomization.
+	Clocked noise processed by a variable shape resonant filter.
+	8 layers of dust/particle noise processed by resonators or all-pass filters.
+	Extended Karplus-Strong (aka Rings' red mode), excited by bursts of white noise or dust noise.
+	Modal resonator (aka Rings' green mode), excited by a mallet or dust noise.
+	Analog kick drum emulation (two flavors).
+	Analog snare drum emulation (two flavors).
+	Analog high-hat emulation (two flavors).
+
+    -> FREAK range  
+
+basic waves x
+super waves x
+Wavetable 	o
+Harmonic 	o
+Karplus 	x
+V.analog 	x	
+Waveshaper	x
+two op fm   x
+Formant     o 
+Chords		o
+speech 		o
+modal 		x
+noise		x
+bass		(sub)
+sawX		o
+harm 		x
+Wave user 	
+
+Sample 
+	scan grainds 
+	clouds grains
+	Hit grans 
+vocoder 
+
+
+
+
+
