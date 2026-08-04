@@ -1,4 +1,4 @@
-
+vv
 import("stdfaust.lib");
 // WIP drum voice with main architecture  
 //useful functions 
@@ -41,7 +41,7 @@ with{
 };
 
 //======================================================= useful function bits 
- notefreq = c1 : stof ; // better MTOF 
+ notefreq = c1 : stof ;
 
 oscmodes(F,x,y,z,M) = hgroup("osc",out)
 with{
@@ -56,7 +56,7 @@ with{
  VCO2(f) = os.ossin(z*f)*x+y : aa.tanh ; 	// placeholder     
 
 }; // mode x y z to edit oscillators 
-        
+        (os.)triangleN : axb : fold 
 
 
 /*    teat edit and make work 
@@ -344,3 +344,87 @@ nine(out0)  = tgroup("[1]9",noteout,out0) // f1,v1,c1 - f2,v2,c2 - f3,v3,c3 - f4
     noteout = par(i,4,sequencer(i,out0)); // 4 sequencers
 
 };
+
+
+
+// simle voice 
+
+import("stdfaust.lib");
+
+faxb(in,a,b) = (in*a)+b;
+stof(s) = 20*2^(10*s); // better MTOF!!
+
+trigtogate(time,t) = out
+with{
+	down(t) = ((-1)*t@(time*ma.SR));
+	sig = down(t)+t; 
+	out = _~+(sig): (1-t)*_>0.5;
+};
+
+
+/// 
+
+adhsrt_tc = out // determin gate time with seq ? - MAXIMISE adtc 
+with{
+	legato = 1; 
+	gate = trgtogate(t,a);
+	decayt = b*ma.SR;
+	attackt = a*ma.SR;
+	out = ad_c(ac,dc,gate,legato,attackt,decayt);
+};
+
+
+
+
+freq  = 220;
+morph = hslider("morph", 0, 0, 1, 0.01); // 0 = sine, 1 = triangle
+
+//
+s2tri(f,x)=out
+with{
+    nHarms = 12; // odd harmonics used to approximate the triangle          strain cpu - add detail 
+    triComponent(k) = ((-1.0,(k-1)/2 : pow) / (k*k)) * os.osc(freq*k);
+    harmonics = par(i, nHarms/2,(i*2+1 : _+0)) : par(i, nHarms/2, k, triComponent(k));
+    out = os.osc(freq) + morph * (8.0/(ma.PI*ma.PI)) * sum(i, nHarms/2 - 1, triComponent(2*(i+1)+1));
+};
+
+a = hslider("a", 0, 0, 1, 0.01);
+b = hslider("b", 0.5, 0, 1, 0.01);
+
+osc = freq,morph : s2tri*0.2 : _,(1+a*9),(b*2)-1: faxb  : ef.wavefold(1): fi.dcblocker;
+// clap clap 
+
+freqF  = hslider("freq filter", 0, 0, 1, 0.01) : stof;
+fq = hslider("rez", 0, 0, 1, 0.01);
+fblend = hslider("Morph", 0.5, 0, 1, 0.01);
+
+filter = _ : fi.svf_morph(freqF, fq*4, fblend*2);
+
+
+
+at = hslider("at", 0, 0, 1, 0.01);
+dt = hslider("dt", 0, 0, 1, 0.01);
+ac = hslider("ac", 0.5, 0, 1, 0.01);
+dc = hslider("dc", 0.5, 0, 1, 0.01);
+legato = 1;
+
+
+T = button("trig"):ba.impulsify;
+voice = hgroup("voice",vgroup("[0]O",osc) : vgroup("[1]F",filter)) ;
+
+
+import("stdfaust.lib");
+G = T : trigtogate(at);
+process = voice;
+
+adtc(at,dt,ac,dc,trig,legato) = en.adsr_bias(At,1,1,Dt,ac,0,dc,legato,trig)
+with{
+    At = at*ma.SR;
+    Dt = dt*ma.SR;
+
+	attackt = a*ma.SR;
+};
+
+// fade in harmonics 3,5,7... progressively as morph increases, keep fundamental at unit gain
+// state variable filter 
+

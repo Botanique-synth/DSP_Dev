@@ -2,9 +2,27 @@
 
 hi ! this is where i comile all my music-related code
 
+Finished stuff :
+
+	rubiciae - online on website - gui app findable 
+	beatroot - online on website 
+
 Currently working on : DAEW : mainvoice 
 
+	[] simple xyz osc        | need saving in Faust  | 
+	[] state variable filter | good ? > check maxrez |
 
+	[] amp ! tanh and modulation 
+
+	> finalyse before merge with main 
+	> implement Faust dir 
+
+	
+will need modulations 
+	
+
+	 
+	
 
 
 wip tree:
